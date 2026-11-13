@@ -1,0 +1,23 @@
+#!/bin/sh
+# Reject AI attribution trailers and empty/oversized subject lines.
+msg_file="$1"
+
+if grep -Eiq '^[[:space:]]*co-authored-by:.*(claude|anthropic|noreply@anthropic\.com|copilot|chatgpt|openai)' "$msg_file"; then
+  echo "commit-msg: AI co-author trailers are not allowed in this repository (see CONTRIBUTING.md)." >&2
+  exit 1
+fi
+if grep -Eiq 'generated with \[?claude code' "$msg_file"; then
+  echo "commit-msg: remove the 'Generated with Claude Code' attribution line." >&2
+  exit 1
+fi
+
+subject=$(grep -v '^#' "$msg_file" | sed -n '1p')
+if [ -z "$subject" ]; then
+  echo "commit-msg: empty subject line." >&2
+  exit 1
+fi
+if [ "${#subject}" -gt 72 ]; then
+  echo "commit-msg: subject line is ${#subject} characters; keep it at 72 or fewer." >&2
+  exit 1
+fi
+exit 0

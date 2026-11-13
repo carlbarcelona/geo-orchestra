@@ -1,8 +1,29 @@
+# dependencies / build output
 node_modules
 dist
+coverage
+*.tsbuildinfo
+
+# pipeline inputs and caches (large, re-creatable; see data/raw/README.md)
 data/raw/*
 !data/raw/README.md
 pipeline/.venv
 __pycache__
-.vercel
+*.pyc
+
+# local config and secrets — never commit credentials
+.env
+.env.*
+!.env.example
 *.local
+_netrc
+.netrc
+.vercel
+
+# editor / OS noise
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+*.log

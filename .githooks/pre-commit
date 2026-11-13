@@ -1,0 +1,27 @@
+#!/bin/sh
+# Block raw data, credentials and very large files; then typecheck and test.
+fail=0
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+for f in $staged; do
+  case "$f" in
+    data/raw/README.md) ;;
+    data/raw/*|pipeline/.venv/*|*_netrc|*.netrc|.env|.env.*|.vercel/*)
+      echo "pre-commit: refusing to commit '$f' (raw data, credentials or local config)." >&2
+      fail=1 ;;
+  esac
+  if [ -f "$f" ]; then
+    size=$(wc -c < "$f" | tr -d ' ')
+    if [ "$size" -gt 15000000 ]; then
+      echo "pre-commit: '$f' is $((size / 1000000)) MB (limit 15 MB). Keep large inputs in data/raw." >&2
+      fail=1
+    fi
+  fi
+done
+[ "$fail" -ne 0 ] && exit 1
+
+# Only run the code checks when code or tests changed.
+if echo "$staged" | grep -Eq '^(src/|tests/|package\.json|tsconfig\.json|vite\.config\.ts)'; then
+  npm run --silent check || { echo "pre-commit: 'npm run check' failed." >&2; exit 1; }
+fi
+exit 0

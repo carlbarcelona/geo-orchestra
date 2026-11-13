@@ -51,6 +51,10 @@ pipeline/.venv/Scripts/python pipeline/prepare_svs.py     # → public/data/svs5
 
 Validation results are written to `public/data/imerg-ph/validation.json` and `public/data/svs5478/alignment.json`. See [docs/verification.md](docs/verification.md).
 
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before committing. Run `npm install` once to enable the git hooks, and `npm run check` before each commit.
+
 ## Documentation
 
 - [docs/mapping-guide.md](docs/mapping-guide.md): how data becomes sound

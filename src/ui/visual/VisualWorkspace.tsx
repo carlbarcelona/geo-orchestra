@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { controller } from '../../playback/controller';
 import {
-  connectClimatology, disconnectClimatology, frameReady, importVisualFeed, loadFrame, seasonalEventsCached, seasonalObservations,
-  seek, setTab, setVisual, setVisualRegion, svsUrl, togglePlay,
+  connectClimatology, currentScanEvents, currentScanGrid, disconnectClimatology, exploreAt, exploreMove, frameReady, importVisualFeed, loadFrame,
+  scanCurrent, seasonalEventsCached, seasonalObservations, seek, setImage, setTab, setVisual, setVisualRegion, svsUrl, togglePlay,
 } from '../../state/actions';
+import { describeFrame } from '../../a11y/braille';
+import { columnProfile } from '../../sound/frameScan';
+import { BrailleChart } from '../shared/BrailleChart';
+import { FrameScore, useSweepProgress } from '../shared/FrameScore';
 import { set, useStore } from '../../state/store';
 import * as I from '../icons';
 import { MusicChart } from '../shared/MusicChart';
@@ -12,7 +16,7 @@ import { TimeSeriesGraph } from '../shared/TimeSeriesGraph';
 
 const PH_BOX = { lonMin: 116, lonMax: 127.5, latMin: 4.5, latMax: 21.5 };
 const REGION_NAMES: Record<string, string> = { philippines: 'Philippines', luzon: 'Luzon', visayas: 'Visayas', mindanao: 'Mindanao' };
-const SPEEDS = [{ value: 2, label: '2 days/s' }, { value: 5, label: '5 days/s' }, { value: 10, label: '10 days/s' }, { value: 30, label: '30 days/s' }];
+const SPEEDS = [{ value: 0.5, label: '0.5 day/s' }, { value: 1, label: '1 day/s' }, { value: 2, label: '2 days/s' }, { value: 5, label: '5 days/s' }, { value: 10, label: '10 days/s' }, { value: 30, label: '30 days/s' }];
 
 export function VisualWorkspace() {
   const media = useStore((s) => s.media);
@@ -20,8 +24,13 @@ export function VisualWorkspace() {
   const visual = useStore((s) => s.visual);
   const sound = useStore((s) => s.sound);
   const linked = link.state === 'reconstructed';
-  const events = useMemo(() => (linked ? seasonalEventsCached() : []), [linked, link.climatology, visual.regionId, sound.scale, sound.pitchLow, sound.pitchHigh]); // eslint-disable-line react-hooks/exhaustive-deps
+  const frameScan = useStore((s) => s.frameScan);
+  const image = useStore((s) => s.image);
+  const events = useMemo(() => (linked ? seasonalEventsCached() : []), [linked, link.climatology, visual.regionId, sound.scale, sound.pitchLow, sound.pitchHigh, frameScan.state, image]); // eslint-disable-line react-hooks/exhaustive-deps
   const labels = useMemo(() => media.manifest?.frames.map((f) => f.label) ?? [], [media.manifest]);
+  const grid = useMemo(() => currentScanGrid(), [visual.day, frameScan.state, image.enabled, media.state]); // eslint-disable-line react-hooks/exhaustive-deps
+  const scanEvents = useMemo(() => (grid ? currentScanEvents() : []), [grid, sound.scale, sound.pitchLow, sound.pitchHigh]); // eslint-disable-line react-hooks/exhaustive-deps
+  const frameLabel = media.manifest?.frames[visual.day]?.label;
   return (
     <main id="main" className="workspace visual" aria-label="Visual feed workspace">
       <NasaDataPanel />
@@ -36,6 +45,11 @@ export function VisualWorkspace() {
           emptyHint={media.state !== 'ready' ? 'No media timeline loaded' : 'Connect matching climatology data in Sound Studio'}
           rightInfo={media.manifest && <span className="chip mono">Day {visual.day + 1}</span>}
           footNote="Video frame index ≠ calendar day · each frame's date is read from the SVS date overlays (366 days, incl. Feb 29)"
+          score={{
+            label: 'Frame score', available: !!grid, events: scanEvents,
+            node: <FrameScore grid={grid} events={scanEvents} tab="visual" title={`Frame score · ${frameLabel ?? ''} · West Pacific 95–150°E`}
+              emptyText={media.state !== 'ready' ? 'Import the visual feed to turn each frame into a score' : frameScan.state === 'loading' ? 'Decoding frames…' : !image.enabled ? 'Image features are off (Sound Studio)' : 'Frame data unavailable'} />,
+          }}
         />
       </div>
     </main>
@@ -137,6 +151,10 @@ function VisualFeed() {
   const [failed, setFailed] = useState<number | null>(null);
   const frames = media.manifest?.frames;
   const linked = link.state === 'reconstructed';
+  const explore = useStore((s) => s.explore);
+  const scanDoc = useStore((s) => s.frameScan.doc);
+  const imageOn = useStore((s) => s.image.enabled);
+  const sweepP = useSweepProgress('visual');
 
   useEffect(() => {
     if (!frames) { setDisplayed(null); return; }
@@ -171,6 +189,7 @@ function VisualFeed() {
         </div>
         <button className={`btn small ${visual.roi ? 'active' : ''}`} aria-pressed={visual.roi} onClick={() => setVisual({ roi: !visual.roi })} disabled={!media.manifest}><I.Roi /> ROI</button>
         <select value={visual.fit} onChange={(e) => setVisual({ fit: e.target.value as 'fit' | 'fill' })} aria-label="Image fit"><option value="fit">Fit</option><option value="fill">Fill</option></select>
+        <button className="btn small" onClick={() => void scanCurrent()} disabled={!scanDoc || !imageOn || media.state !== 'ready'} aria-keyshortcuts="S"><I.Wave size={14} /> Sweep frame</button>
         <button className="btn icon small" onClick={fullscreen} aria-label="Toggle fullscreen"><I.Expand /></button>
       </div>
       <div className={`frame-wrap ${visual.roi ? 'roi' : ''}`} ref={stage.ref}>
@@ -192,7 +211,22 @@ function VisualFeed() {
         )}
         {media.state === 'ready' && displayed && (
           <>
-            <div style={{ position: 'relative', width: stage.w, height: stage.h, flex: 'none' }}>
+            <div style={{ position: 'relative', width: stage.w, height: stage.h, flex: 'none', outline: 'none' }}
+              tabIndex={scanDoc && imageOn ? 0 : -1} role="application"
+              aria-label="Explore the frame by touch or keyboard: arrow keys move a 1-degree cursor over the West Pacific region and you hear and read the rain there. Press S to sweep the whole frame."
+              onKeyDown={(e) => {
+                const k: Record<string, [number, number]> = { ArrowUp: [1, 0], ArrowDown: [-1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+                if (k[e.key]) { e.preventDefault(); e.stopPropagation(); exploreMove(k[e.key][0] * (e.shiftKey ? 5 : 1), k[e.key][1] * (e.shiftKey ? 5 : 1)); }
+              }}
+              onPointerMove={(e) => {
+                if (!scanDoc || !imageOn || (e.pointerType === 'mouse' && e.buttons === 0 && !e.altKey)) return;
+                const r = e.currentTarget.getBoundingClientRect();
+                const lon = box.lonMin + ((e.clientX - r.left) / r.width) * (box.lonMax - box.lonMin);
+                const lat = box.latMax - ((e.clientY - r.top) / r.height) * (box.latMax - box.latMin);
+                const g = scanDoc.grid;
+                const col = Math.floor((lon - g.lonMin) / g.step), row = Math.floor((lat - g.latMin) / g.step);
+                if (col >= 0 && row >= 0 && col < g.ncol && row < g.nrow && (explore?.col !== col || explore?.row !== row)) exploreAt(row, col);
+              }}>
             <img src={displayed.src} style={{ width: '100%', height: '100%', opacity: pending ? 0.25 : 1 }} alt={`NASA SVS 5478 IMERG precipitation climatology frame for ${shownFrame?.label} (seasonal average 2001–2022)${visual.roi ? ', West Pacific region of interest' : ''}`}
               />
             {!visual.roi && (
@@ -202,6 +236,19 @@ function VisualFeed() {
               </>
             )}
             {visual.roi && <div className="roi-box" style={{ left: `${a.x}%`, top: `${a.y}%`, width: `${b.x - a.x}%`, height: `${b.y - a.y}%` }} />}
+            {scanDoc && imageOn && (() => {
+              const g = scanDoc.grid;
+              const sa = pct(g.lonMin, g.latMin + g.nrow * g.step), sb = pct(g.lonMin + g.ncol * g.step, g.latMin);
+              return (
+                <>
+                  {sweepP != null && <div aria-hidden="true" style={{ position: 'absolute', left: `${sa.x + (sb.x - sa.x) * sweepP}%`, top: `${sa.y}%`, height: `${sb.y - sa.y}%`, width: 2, background: '#f5b942', boxShadow: '0 0 8px #f5b942' }} />}
+                  {explore && (() => {
+                    const ca = pct(g.lonMin + explore.col * g.step, g.latMin + (explore.row + 1) * g.step), cb = pct(g.lonMin + (explore.col + 1) * g.step, g.latMin + explore.row * g.step);
+                    return <div aria-hidden="true" style={{ position: 'absolute', left: `${ca.x}%`, top: `${ca.y}%`, width: `${cb.x - ca.x}%`, height: `${cb.y - ca.y}%`, border: '2px solid #fff', boxShadow: '0 0 0 1px #000' }} />;
+                  })()}
+                </>
+              );
+            })()}
             </div>
             <div className="frame-label" style={{ top: 10, left: 10, fontWeight: 600 }}>IMERG precipitation climatology</div>
             <div className="frame-label" style={{ top: 10, right: 10, fontSize: 12 }}>Authentic NASA SVS frame #{shownFrame?.sourceFrame}</div>
@@ -267,7 +314,7 @@ function SoundStudio() {
           <span className="label">Source</span>
           <div style={{ display: 'grid', gap: 5 }}>
             <span className={`chip ${linked ? 'accent' : link.state === 'incompatible' ? 'danger' : ''}`}><I.Link size={13} /> Linked measurements — {linked ? 'Reconstructed' : link.state === 'incompatible' ? 'Incompatible' : 'Not connected'}</span>
-            <span className="chip" style={{ opacity: 0.6 }} title="Deferred: image-derived features are not rainfall measurements"><I.Image size={13} /> Image features — Experimental (off)</span>
+            <ImageFeaturesToggle />
           </div>
         </div>
         {media.state === 'ready' && !linked && (
@@ -317,11 +364,68 @@ function SoundStudio() {
   );
 }
 
+function ImageFeaturesToggle() {
+  const image = useStore((s) => s.image);
+  const fs = useStore((s) => s.frameScan);
+  return (
+    <div style={{ display: 'grid', gap: 4 }}>
+      <button className={`chip ${image.enabled ? 'accent' : ''}`} style={{ cursor: 'pointer', textAlign: 'left', background: image.enabled ? 'var(--accent-soft)' : 'transparent', font: 'inherit', fontSize: 12.5 }} aria-pressed={image.enabled} onClick={() => setImage({ enabled: !image.enabled })}>
+        <I.Image size={13} /> Image features · decoded from NASA colorbar — {image.enabled ? 'on' : 'off'}
+      </button>
+      {image.enabled && fs.doc && (
+        <>
+          <label className="row" style={{ fontSize: 12.5 }}><input type="checkbox" checked={image.featureVoice} onChange={(e) => setImage({ featureVoice: e.target.checked })} /> Rain-band voice (follows the band north/south)</label>
+          <label className="row" style={{ fontSize: 12.5 }}><input type="checkbox" checked={image.sweepEveryFrame} onChange={(e) => setImage({ sweepEveryFrame: e.target.checked })} /> Sweep every frame during timelapse (≤1 day/s)</label>
+          <span className="muted" style={{ fontSize: 11 }}>Decoded values agree with the IMERG reconstruction: r = {fs.doc.decodeValidation.vsReconstructedClimatology.pearsonR}, bias {fs.doc.decodeValidation.vsReconstructedClimatology.meanBiasMmDay} mm/day.</span>
+        </>
+      )}
+      {fs.state === 'error' && <span className="muted" style={{ fontSize: 11 }}>Frame data unavailable: {fs.message}</span>}
+    </div>
+  );
+}
+
+function FrameDescribe() {
+  const visual = useStore((s) => s.visual);
+  const doc = useStore((s) => s.frameScan.doc);
+  const fsState = useStore((s) => s.frameScan.state);
+  const imageOn = useStore((s) => s.image.enabled);
+  const media = useStore((s) => s.media);
+  const link = useStore((s) => s.link);
+  const grid = useMemo(() => currentScanGrid(), [visual.day, doc, imageOn, media.state]); // eslint-disable-line react-hooks/exhaustive-deps
+  const meas = useMemo(() => seasonalObservations(), [link.climatology, visual.regionId, media.manifest]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (media.state !== 'ready') return <div className="empty"><I.Info size={28} /><div className="big">Import the visual feed to hear and read each frame</div></div>;
+  if (!imageOn) return <div className="empty"><I.Image size={28} /><div>Image features are off. Turn them on in Sound Studio.</div></div>;
+  if (!doc || !grid) return <div className="empty"><div>{fsState === 'loading' ? 'Decoding frames…' : 'Frame data unavailable'}</div></div>;
+  const f = doc.days[visual.day];
+  const profile = columnProfile(grid);
+  const profKnown = profile.filter((v): v is number => v != null);
+  const wettestCol = profile.indexOf(Math.max(...profKnown));
+  const band = doc.days.map((d) => d.bandLat);
+  const ph = doc.days.map((d) => d.phLandMmDay);
+  return (
+    <div>
+      <p style={{ margin: '0 0 8px', fontSize: 13.5, lineHeight: 1.45 }}>{describeFrame(f, doc.days, meas[visual.day]?.value ?? null)}</p>
+      <div className="row" style={{ marginBottom: 8, flexWrap: 'wrap' }}>
+        <button className="btn small primary" onClick={() => void scanCurrent()}><I.Wave size={13} /> Sweep this frame (S)</button>
+        <span className="muted" style={{ fontSize: 11.5 }}>Explore: focus the frame, then use the arrow keys (Shift = 5°)</span>
+      </div>
+      <BrailleChart title="This frame, west → east (rain per longitude)" values={profile} range={[0, 24]}
+        summary={`From 95°E to 150°E; wettest near ${(95.5 + wettestCol).toFixed(0)}°E at ${Math.max(...profKnown).toFixed(1)} mm/day (column mean), driest ${Math.min(...profKnown).toFixed(1)} mm/day.`} />
+      <BrailleChart title="Philippines over the year (image-derived)" values={ph} index={visual.day}
+        summary={`Jan → Dec. Lowest ${Math.min(...ph.map((v) => v ?? 99)).toFixed(1)} mm/day, highest ${Math.max(...ph.map((v) => v ?? 0)).toFixed(1)} mm/day; today ${f.phLandMmDay?.toFixed(1)} mm/day. The pointer line marks today.`} />
+      <BrailleChart title="Rain-band latitude over the year" values={band} index={visual.day} range={[-10, 30]}
+        summary={`Higher = farther north. The band moves from about ${Math.min(...band.map((v) => v ?? 99)).toFixed(0)}° to ${Math.max(...band.map((v) => v ?? -99)).toFixed(0)}°N; today ${f.bandLat?.toFixed(1)}° and ${f.bandTrend === 'steady' ? 'steady' : 'moving ' + f.bandTrend}.`} />
+    </div>
+  );
+}
+
 function SeasonalGraph() {
   const link = useStore((s) => s.link);
   const visual = useStore((s) => s.visual);
   const media = useStore((s) => s.media);
-  const [tab, setTabState] = useState<'rain' | 'dist'>('rain');
+  const tab = useStore((s) => s.graphTab);
+  const setTabState = (t: 'describe' | 'rain' | 'band' | 'dist') => set({ graphTab: t });
+  const doc = useStore((s) => s.frameScan.doc);
   const obs = useMemo(() => seasonalObservations(), [link.climatology, visual.regionId, media.manifest]); // eslint-disable-line react-hooks/exhaustive-deps
   const linked = link.state === 'reconstructed' && obs.length > 0;
   const ticks = useMemo(() => (media.manifest?.frames ?? []).map((f, i) => ({ f, i })).filter(({ f }) => f.label.endsWith(' 01') && ['Jan', 'Apr', 'Jul', 'Oct'].includes(f.label.slice(0, 3))).map(({ f, i }) => ({ index: i, label: f.label.slice(0, 3) })), [media.manifest]);
@@ -331,10 +435,25 @@ function SeasonalGraph() {
       <div className="panel-head"><h2 className="panel-title" id="graphs-title">Graphs</h2></div>
       <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div className="seg" role="tablist" aria-label="Graph type" style={{ width: '100%' }}>
+          <button role="tab" style={{ flex: 1 }} aria-selected={tab === 'describe'} onClick={() => setTabState('describe')}>Describe</button>
           <button role="tab" style={{ flex: 1 }} aria-selected={tab === 'rain'} onClick={() => setTabState('rain')}>Rainfall</button>
-          <button role="tab" style={{ flex: 1 }} aria-selected={tab === 'dist'} onClick={() => setTabState('dist')}>Distribution</button>
+          <button role="tab" style={{ flex: 1 }} aria-selected={tab === 'band'} onClick={() => setTabState('band')}>Band</button>
+          <button role="tab" style={{ flex: 1 }} aria-selected={tab === 'dist'} onClick={() => setTabState('dist')}>Distrib.</button>
         </div>
-        {!linked ? (
+        {tab === 'describe' ? (
+          <FrameDescribe />
+        ) : tab === 'band' ? (
+          doc ? (
+            <>
+              <div className="row"><b>Rain-band latitude (image-derived)</b><span className="spacer" /><span className="mono">{doc.days[visual.day]?.bandLat?.toFixed(1)}°</span></div>
+              <div style={{ flex: 1, minHeight: 0 }}>
+                <TimeSeriesGraph points={doc.days.map((d) => ({ key: d.label, value: d.bandLat != null ? d.bandLat + 10 : null }))} cursor={visual.day} onSelect={(i) => (linked ? seek(i) : setVisual({ day: i }))}
+                  yLabel="lat + 10°" ticks={ticks} formatValue={(v) => `${(v - 10).toFixed(1)}°`} color="#a78bfa"
+                  describe={`Latitude of the heaviest rain band in the Philippine sector across the year. Today ${doc.days[visual.day]?.bandLat?.toFixed(1)} degrees.`} />
+              </div>
+            </>
+          ) : <div className="empty">Import the visual feed first</div>
+        ) : !linked ? (
           <div className="empty" style={{ border: '1px dashed var(--line-2)', borderRadius: 8 }}>
             <I.Chart size={34} /><div className="big">Connect numerical data to show graphs</div><div className="italic">No values inferred from this preview</div>
           </div>

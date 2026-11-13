@@ -67,7 +67,7 @@ export interface Observation {
 }
 
 // ---------- 3. Sound event ----------
-export type SoundEventKind = 'melody' | 'sample' | 'texture' | 'marker';
+export type SoundEventKind = 'melody' | 'sample' | 'texture' | 'marker' | 'scan' | 'feature';
 
 export interface SoundEvent {
   id: string;
@@ -76,7 +76,7 @@ export interface SoundEvent {
   sourceObservationIds: string[];
   datasetId: string;
   selectionId: string;
-  original: { value: number | null; unit: 'mm/hr'; t: string; label: string };
+  original: { value: number | null; unit: 'mm/hr' | 'mm/day'; t: string; label: string; derivation?: 'measured' | 'image-derived' | 'reconstructed' };
   offset: number;        // fraction of a step (0..1) after the step start
   duration: number;      // fraction of a step
   midi?: number;         // melody/sample note
@@ -84,7 +84,8 @@ export interface SoundEvent {
   velocity?: number;     // 0..1
   pan?: number;          // -1..1
   texture?: { dropsPerSecond: number; intensity: number; brightness: number };
-  marker?: 'missing' | 'zero' | 'year' | 'clipped';
+  marker?: 'missing' | 'zero' | 'year' | 'clipped' | 'turn';
+  scan?: { col: number; row: number; lat: number; lon: number };
   mappingVersion: string;
   explanation: string;
 }
@@ -120,6 +121,19 @@ export interface ClimatologyLinkage {
 export interface AlignmentEvidence {
   overlayFrames: number; dayRuns: number; distinctOverlays: number; datesListLines: number;
   datesListDedupMatchesRuns: boolean; manualSpotChecks: { frame: number; overlay: string }[]; note: string; method: string;
+}
+
+// ---------- 5. Frame scan (image-derived, decoded through NASA's colorbar) ----------
+export interface FrameFeature {
+  day: number; label: string; phLandMmDay: number | null; phBoxMmDay: number | null; roiMeanMmDay: number; roiMaxMmDay: number;
+  wetPct: number; bandLat: number | null; bandPeakMmDay: number; unknownPct: number; bandDelta14: number | null; bandTrend: 'north' | 'south' | 'steady';
+}
+export interface FrameScanDoc {
+  contract: 'frame-scan'; version: number; unit: 'mm/day'; source: string;
+  grid: { ncol: number; nrow: number; lonMin: number; latMin: number; step: number; scale: number; unknown: number; layout: string; path: string };
+  thresholds: { wetMmDay: number; sectorLon: [number, number]; phBox: [number, number, number, number] };
+  decodeValidation: { colorbarRoundTripMaxErrorMmDay: number; unknownPixelPct: number; vsReconstructedClimatology: { pearsonR: number; meanBiasMmDay: number } };
+  days: FrameFeature[];
 }
 
 // ---------- Processed-JSON import format (brief §4 standardized record) ----------

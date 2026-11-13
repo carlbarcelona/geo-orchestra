@@ -73,7 +73,7 @@ export function LayerLevels() {
       <span className="mono">{layers[k].toFixed(2)}</span>
     </div>
   );
-  return <>{row('melody', 'Melody layer')}{row('texture', 'Rain texture')}{row('markers', 'Markers')}</>;
+  return <>{row('melody', 'Melody layer')}{row('texture', 'Rain texture')}{row('markers', 'Markers')}{row('image', 'Frame sweep & band')}</>;
 }
 
 export function MappingRows({ compact }: { compact?: boolean }) {

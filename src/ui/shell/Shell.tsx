@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { controller } from '../../playback/controller';
 import { MAPPING } from '../../sound/mapping';
-import { audition, openProject, saveProject, setTab, stepBy, togglePlay, toggleLoop } from '../../state/actions';
+import { audition, openProject, saveProject, scanCurrent, setTab, stepBy, togglePlay, toggleLoop } from '../../state/actions';
 import { set, useStore } from '../../state/store';
 import * as I from '../icons';
 
@@ -100,6 +100,7 @@ export function useShortcuts() {
       if (t.closest('input, select, textarea, [contenteditable="true"]') || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === ' ' && !t.closest('button, a, [role="tab"]')) { e.preventDefault(); void togglePlay(); }
       else if (e.key === 'l' || e.key === 'L') toggleLoop();
+      else if (e.key === 's' || e.key === 'S') void scanCurrent();
       else if (e.key === 'ArrowRight' && !t.closest('[role="tablist"]')) { e.preventDefault(); stepBy(1); }
       else if (e.key === 'ArrowLeft' && !t.closest('[role="tablist"]')) { e.preventDefault(); stepBy(-1); }
       else if (e.key === 'Home') controller.seek(controller.range[0]);
@@ -145,6 +146,12 @@ export function Dialogs() {
           <label className="row" style={{ padding: '6px 0' }}><input type="checkbox" checked={a11y.highContrast} onChange={(e) => setA({ highContrast: e.target.checked })} /> High contrast</label>
           <label className="row" style={{ padding: '6px 0' }}><input type="checkbox" checked={a11y.largeText} onChange={(e) => setA({ largeText: e.target.checked })} /> Larger text and numbers</label>
           <label className="row" style={{ padding: '6px 0' }}><input type="checkbox" checked={a11y.announceSteps} onChange={(e) => setA({ announceSteps: e.target.checked })} /> Announce the value when stepping while paused</label>
+          <label className="row" style={{ padding: '6px 0' }}><input type="checkbox" checked={a11y.brailleCharts} onChange={(e) => setA({ brailleCharts: e.target.checked })} /> Braille charts (Unicode braille dots for refreshable braille displays)</label>
+          <label className="row" style={{ padding: '6px 0' }}>Describe the frame during visual-feed playback every
+            <select value={a11y.describeEvery} onChange={(e) => setA({ describeEvery: Number(e.target.value) })} aria-label="Describe every N frames">
+              <option value={0}>never</option><option value={7}>7 days</option><option value={15}>15 days</option><option value={30}>30 days</option>
+            </select></label>
+          <label className="row" style={{ padding: '6px 0' }}><input type="checkbox" checked={a11y.haptics} onChange={(e) => setA({ haptics: e.target.checked })} /> Vibrate with rain intensity while exploring (Android browsers; not supported on iPhone)</label>
           <p style={{ marginTop: 10 }}>Screen readers hear actions and status changes (play, pause, buffering, dataset loaded, selection) but not every frame during playback. The map has a keyboard alternative: the region selector and the coordinate picker in Map view.</p>
           <p>Accessibility checks performed: keyboard-only walkthrough, focus visibility, contrast of text tokens, labelled controls. Not yet validated with blind or low-vision participants.</p>
         </Dialog>
@@ -179,7 +186,7 @@ export function Dialogs() {
       )}
       {d.shortcuts && (
         <Dialog title="Keyboard shortcuts" onClose={close('shortcuts')}>
-          <dl className="kv"><dt>Space</dt><dd>Play / pause</dd><dt>L</dt><dd>Loop on/off</dd><dt>← →</dt><dd>Previous / next observation</dd><dt>Home / End</dt><dd>Range start / end</dd><dt>?</dt><dd>This list</dd><dt>Esc</dt><dd>Close dialogs</dd></dl>
+          <dl className="kv"><dt>Space</dt><dd>Play / pause</dd><dt>L</dt><dd>Loop on/off</dd><dt>S</dt><dd>Sweep the current frame / month west → east</dd><dt>Arrows on frame</dt><dd>Explore cell by cell (Shift = 5°)</dd><dt>← →</dt><dd>Previous / next observation</dd><dt>Home / End</dt><dd>Range start / end</dd><dt>?</dt><dd>This list</dd><dt>Esc</dt><dd>Close dialogs</dd></dl>
         </Dialog>
       )}
     </>

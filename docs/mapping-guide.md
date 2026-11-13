@@ -17,3 +17,22 @@ Sound is a **designed mapping** of satellite estimates. It is not a recording. T
 - **Area vs cell:** the event inspector states whether a note came from an area mean (cos-latitude weighted, valid cells inside a Natural Earth outline, with coverage) or from a single 0.1° cell.
 
 The visual feed uses the same mapping on the reconstructed seasonal climatology (one step per seasonal day).
+
+## Frame sweep (version `scan-v1`): the Hubble approach
+
+This follows NASA's *Sonification of a Hubble Deep Space Image*: a line sweeps across the picture, vertical position sets pitch, and brightness sets loudness.
+
+| Frame property | Sound |
+| --- | --- |
+| West → east position (95–150°E for the visual feed; the Philippine extent for the map) | Time: the sweep lasts 4.5 s (frame) or 3.5 s (month), or one timelapse step |
+| Latitude (north = up) | Pitch on the current scale and range: farther north is higher |
+| Rain in the cell | Loudness (square root of value / reference: 24 mm/day for frames, 1.5 mm/hr for measured maps) |
+| West / east | Stereo left / right |
+| Dry (< 2 mm/day) or unknown cells (coastlines, labels) | Silence |
+
+- Each 1° column plays at most 4 notes: its most intense latitude rows, one per pitch.
+- **Rain-band voice:** a gliding string tone follows the latitude of the heaviest rain band in the Philippine sector (115–130°E). You hear the monsoon band climb north toward July and fall back south. A two-note chime marks the days when the band turns around.
+- **Sources:**
+  - In the Visual feed, values are **image-derived**: decoded from NASA's colorbar (see verification.md).
+  - In the Numerical map, values are **measured** IMERG cells, averaged to 0.5°.
+- The sweep never changes the measurement melody (`rain-v1`). It is a separate layer ("Frame sweep & band") with its own volume.

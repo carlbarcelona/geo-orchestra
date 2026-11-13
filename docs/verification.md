@@ -62,3 +62,25 @@ The console showed no application errors.
 **Timing:**
 - UI state updates are timer-driven from the audio clock. In the test browser they fired within about 12 ms of the scheduled time.
 - The paint-time lag shown in the status bar (`sync mean/max ms`) **could not be verified** against the 100 ms target. The automated browser window was throttled to about 3 animation frames per second. Verify on the declared demonstration device in a foreground window.
+
+## Image-derived frame values (`public/data/svs5478/frame-features.json`)
+
+- **Colorbar calibration:** the tick marks at x = 155 … 791 px mark 2 … 22 mm/day, and a linear fit gives 0.031446 mm/day per px. Decoding the colorbar's own ticks returns them within 0.3 mm/day (asserted).
+- **Decoding:** taken from the lossless 2048×1024 source frames. Each pixel is matched to the nearest colorbar color. 1.18% of pixels are too far from any colorbar color (coastlines, labels) and are treated as unknown.
+- **Cross-validation:** the decoded Philippine land mean was compared with the IMERG-based reconstruction (×24) over 366 days. The result is Pearson **r = 0.97**, mean bias **−0.30 mm/day** (6.98 vs 7.28 mm/day). The two sources are independent: NASA's daily product rendered as images, and our monthly-derived reconstruction. Their agreement supports both.
+- **Phenomenon check:** the decoded rain-band latitude in the Philippine sector is 1.5°N on Jan 15 and 13.1°N on Jul 15, which matches the monsoon / ITCZ migration.
+- **Automated:** `tests/framescan.test.ts` (18 tests) covers:
+  - braille encoding
+  - sweep order, pitch and loudness
+  - unknown cells staying silent
+  - west/east panning
+  - the decode-validation thresholds
+  - monsoon direction
+  - turning-point markers
+  - description wording
+- **Browser:**
+  - frame sweep: gold line over the NASA frame plus the score playhead
+  - keyboard exploration announced "12.5°N, 124.5°E: 15.6 mm/day, very heavy (image-derived)"
+  - braille charts render
+  - timelapse with a sweep on every frame, at 1 day/s
+  - no console errors

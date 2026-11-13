@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Selection } from '../../contracts';
 import { cellValue, formatValue, monthLabel, type Dataset } from '../../data/dataset';
 import { MAP_RANGE, MAP_TICKS, RAMP_CSS, valueColor, valueToT } from '../colormap';
+import { useSweepProgress } from './FrameScore';
 
 interface Props {
   dataset: Dataset;
@@ -19,6 +20,7 @@ export function RegionMap({ dataset, monthIndex, selection, onSelectCell }: Prop
   const [size, setSize] = useState({ w: 600, h: 400 });
   const [hover, setHover] = useState<{ li: number; lo: number } | null>(null);
   const g = dataset.grid!;
+  const sweepP = useSweepProgress('numerical');
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -108,12 +110,17 @@ export function RegionMap({ dataset, monthIndex, selection, onSelectCell }: Prop
       const w = Math.max(6, view.x(selection.lon + s) - xa), h = Math.max(6, view.y(selection.lat - s) - ya);
       ctx.strokeStyle = '#f5b942'; ctx.lineWidth = 2.5; ctx.strokeRect(xa - 2, ya - 2, w + 4, h + 4);
     }
+    if (sweepP != null) {
+      const xs = x0 + (x1 - x0) * sweepP;
+      ctx.strokeStyle = '#f5b942'; ctx.lineWidth = 2.5; ctx.shadowColor = '#f5b942'; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.moveTo(xs, y0); ctx.lineTo(xs, y1); ctx.stroke(); ctx.shadowBlur = 0;
+    }
     if (hover) {
       const lat = g.lat0 + hover.li * g.step, lon = g.lon0 + hover.lo * g.step, s = g.step / 2;
       ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1;
       ctx.strokeRect(view.x(lon - s), view.y(lat + s), view.x(lon + s) - view.x(lon - s), view.y(lat - s) - view.y(lat + s));
     }
-  }, [view, raster, selection, hover, dataset, size, g]);
+  }, [view, raster, selection, hover, dataset, size, g, sweepP]);
 
   const toCell = (e: React.MouseEvent) => {
     const r = canvasRef.current!.getBoundingClientRect();

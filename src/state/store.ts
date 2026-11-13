@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AlignmentEvidence, ClimatologyLinkage, Selection, SoundEvent, VisualMediaManifest } from '../contracts';
+import type { AlignmentEvidence, ClimatologyLinkage, FrameScanDoc, Selection, SoundEvent, VisualMediaManifest } from '../contracts';
 import type { Dataset } from '../data/dataset';
 import type { InstrumentId, LayerLevels, SoundMode } from '../sound/engine';
 
@@ -21,7 +21,7 @@ export interface SoundSettings {
   preset: 'rain-pitch' | 'rain-pitch-spatial';
 }
 
-export interface A11ySettings { reducedMotion: boolean; highContrast: boolean; largeText: boolean; announceSteps: boolean }
+export interface A11ySettings { reducedMotion: boolean; highContrast: boolean; largeText: boolean; announceSteps: boolean; brailleCharts: boolean; describeEvery: number; haptics: boolean }
 
 export interface AppState {
   tab: Tab;
@@ -39,7 +39,13 @@ export interface AppState {
   pauseReason: string | null;
   sound: SoundSettings;
   selectedEventId: string | null;
-  chartTab: 'roll' | 'details';
+  chartTab: 'roll' | 'score' | 'details';
+  /** image features (decoded SVS frames) */
+  frameScan: { state: 'none' | 'loading' | 'ready' | 'error'; doc: FrameScanDoc | null; bytes: Uint8Array | null; message: string };
+  image: { enabled: boolean; sweepEveryFrame: boolean; featureVoice: boolean };
+  sweep: { active: boolean; startedAt: number; seconds: number; tab: Tab } | null;
+  explore: { row: number; col: number } | null;
+  graphTab: 'describe' | 'rain' | 'band' | 'dist';
   /** visual feed */
   media: { state: MediaState; message: string; manifest: VisualMediaManifest | null; alignment: AlignmentEvidence | null };
   link: { state: LinkState; message: string; climatology: ClimatologyLinkage | null };
@@ -53,7 +59,7 @@ export interface AppState {
 
 export const DEFAULT_SOUND: SoundSettings = {
   mode: 'musical', instrument: 'soft-piano', scale: 'C pentatonic', pitchLow: 48, pitchHigh: 84, master: 0.8,
-  layers: { melody: 0.8, texture: 0.75, markers: 0.5 }, spatialPhrases: false, preset: 'rain-pitch',
+  layers: { melody: 0.8, texture: 0.75, markers: 0.5, image: 0.7 }, spatialPhrases: false, preset: 'rain-pitch',
 };
 
 export const useStore = create<AppState>(() => ({
@@ -72,10 +78,15 @@ export const useStore = create<AppState>(() => ({
   sound: DEFAULT_SOUND,
   selectedEventId: null,
   chartTab: 'roll',
+  frameScan: { state: 'none', doc: null, bytes: null, message: '' },
+  image: { enabled: true, sweepEveryFrame: false, featureVoice: true },
+  sweep: null,
+  explore: null,
+  graphTab: 'describe',
   media: { state: 'none', message: '', manifest: null, alignment: null },
   link: { state: 'none', message: '', climatology: null },
   visual: { day: 0, mode: 'timelapse', roi: false, fit: 'fit', regionId: 'philippines', speed: 10, fullscreen: false },
-  a11y: { reducedMotion: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches, highContrast: false, largeText: false, announceSteps: false },
+  a11y: { reducedMotion: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches, highContrast: false, largeText: false, announceSteps: false, brailleCharts: true, describeEvery: 15, haptics: true },
   dialogs: { a11y: false, legend: false, sources: false, shortcuts: false },
   announcement: { text: '', id: 0 },
   eventsCache: null,

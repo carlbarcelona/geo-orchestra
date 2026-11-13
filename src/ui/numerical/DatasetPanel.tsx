@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { formatValue, monthLabel } from '../../data/dataset';
-import { currentObservations, seek, selectCell, setView } from '../../state/actions';
+import { currentObservations, scanCurrent, seek, selectCell, setView } from '../../state/actions';
 import { useStore } from '../../state/store';
 import * as I from '../icons';
 import { RegionMap } from '../shared/RegionMap';
@@ -127,7 +127,11 @@ export function DatasetPanel() {
         <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {ds.grid ? (
             <>
-              <CellPicker />
+              <div className="row" style={{ flexWrap: 'wrap' }}>
+                <CellPicker />
+                <span className="spacer" />
+                <button className="btn small primary" onClick={() => void scanCurrent()} aria-keyshortcuts="S"><I.Wave size={13} /> Sweep this month (S)</button>
+              </div>
               <RegionMap dataset={ds} monthIndex={cursor} selection={selection} onSelectCell={selectCell} />
             </>
           ) : <div className="empty"><I.Pin size={30} /><div className="big">Map requires gridded coordinates</div><div className="italic">Imported point files are listed in Table and Graph.</div></div>}

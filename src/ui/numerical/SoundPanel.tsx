@@ -3,6 +3,7 @@ import { monthLabel } from '../../data/dataset';
 import { currentObservations, numericalEvents, updateSound } from '../../state/actions';
 import { useStore } from '../../state/store';
 import * as I from '../icons';
+import { BrailleChart } from '../shared/BrailleChart';
 import { Disclosure, InstrumentRow, LayerLevels, LegendButton, MappingRows, MasterVolume, ModeTabs, PitchRange, ScaleRow } from '../shared/SoundControls';
 
 export function SoundPanel() {
@@ -57,6 +58,10 @@ export function SoundPanel() {
               </dl>
             </div>
           </div>
+        )}
+        {o && (
+          <BrailleChart title={`${selection?.label ?? ''} · all months`} values={obs.map((x) => x.value)} index={cursor}
+            summary={`${obs.length} months. Lowest ${Math.min(...obs.map((x) => x.value ?? 99)).toFixed(3)}, highest ${Math.max(...obs.map((x) => x.value ?? 0)).toFixed(3)} mm/hr; the pointer line marks ${o.t}.`} />
         )}
       </div>
     </section>

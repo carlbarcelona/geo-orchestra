@@ -33,7 +33,12 @@ The prepared data is static under `public/data/`, so no backend or live NASA con
    2. **Connect climatology**. Its status shows *Reconstructed — approximate*.
    3. Play, toggle **ROI**, and open **Frame alignment** to see the evidence.
 
-Keyboard: `Space` play/pause · `L` loop · `←/→` step · `Home/End` · `?`.
+6. **Hear what a frame shows.**
+   - Press **S** (or **Sweep frame**) to sweep the frame west → east, as NASA's Hubble sonifications do: north is higher pitch, more rain is louder.
+   - Focus the frame and use the arrow keys to explore it cell by cell.
+   - The **Describe** tab explains the frame in words and shows **braille charts** for refreshable braille displays.
+
+Keyboard: `Space` play/pause · `L` loop · `S` sweep · `←/→` step · arrows on the frame explore · `Home/End` · `?`.
 
 ## Data preparation (reproducible)
 
@@ -47,6 +52,7 @@ curl -L -o data/raw/ne/admin1.geojson https://raw.githubusercontent.com/nvkelso/
 # 3. Build the packages
 pipeline/.venv/Scripts/python pipeline/prepare_imerg.py   # → public/data/imerg-ph + svs5478/climatology-ph.json
 pipeline/.venv/Scripts/python pipeline/prepare_svs.py     # → public/data/svs5478 (public SVS assets, ~800 MB cache)
+pipeline/.venv/Scripts/python pipeline/analyze_svs_frames.py  # → frame-scan.bin + frame-features.json (decode + validation)
 ```
 
 Validation results are written to `public/data/imerg-ph/validation.json` and `public/data/svs5478/alignment.json`. See [docs/verification.md](docs/verification.md).

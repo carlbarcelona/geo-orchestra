@@ -11,7 +11,7 @@ export const INSTRUMENTS: { id: InstrumentId; label: string }[] = [
   { id: 'marimba', label: 'Marimba' },
 ];
 
-export interface LayerLevels { melody: number; texture: number; markers: number }
+export interface LayerLevels { melody: number; texture: number; markers: number; image: number }
 
 function gainToDb(g: number) { return g <= 0.0001 ? -Infinity : 20 * Math.log10(g); }
 
@@ -34,6 +34,11 @@ class SoundEngine {
   private melodyCh!: Tone.Channel;
   private textureCh!: Tone.Channel;
   private markerCh!: Tone.Channel;
+  private imageCh!: Tone.Channel;
+  private scanPool: { panner: Tone.Panner; synth: Tone.Synth }[] = [];
+  private scanNext = 0;
+  private featureVoice!: Tone.Synth;
+  private featureOn = false;
   private reverb!: Tone.Freeverb;
   private instrument!: Tone.PolySynth;
   private instrumentId: InstrumentId = 'soft-piano';
@@ -45,7 +50,7 @@ class SoundEngine {
   private dropFilter!: Tone.Filter;
   private markerSynth!: Tone.Synth;
   private gapSynth!: Tone.MembraneSynth;
-  private levels: LayerLevels = { melody: 0.8, texture: 0.75, markers: 0.5 };
+  private levels: LayerLevels = { melody: 0.8, texture: 0.75, markers: 0.5, image: 0.7 };
   private masterGain = 0.8;
   available = true;
   lastError: string | null = null;
@@ -72,6 +77,18 @@ class SoundEngine {
     this.melodyCh = new Tone.Channel({ volume: gainToDb(this.levels.melody) }).connect(this.reverb);
     this.textureCh = new Tone.Channel({ volume: gainToDb(this.levels.texture) }).connect(this.master);
     this.markerCh = new Tone.Channel({ volume: gainToDb(this.levels.markers) }).connect(this.master);
+    this.imageCh = new Tone.Channel({ volume: gainToDb(this.levels.image) }).connect(this.reverb);
+    // frame-scan voices: a pool of panned bell tones (west = left, east = right)
+    for (let i = 0; i < 14; i++) {
+      const panner = new Tone.Panner(0).connect(this.imageCh);
+      const synth = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.004, decay: 0.22, sustain: 0.05, release: 0.25 } }).connect(panner);
+      synth.volume.value = -9;
+      this.scanPool.push({ panner, synth });
+    }
+    // feature voice: a gliding string tone that follows the rain-band latitude
+    const fvFilter = new Tone.Filter({ type: 'lowpass', frequency: 1400, Q: 0.6 }).connect(this.imageCh);
+    this.featureVoice = new Tone.Synth({ oscillator: { type: 'sawtooth' }, portamento: 0.12, envelope: { attack: 0.25, decay: 0.3, sustain: 0.7, release: 0.8 } }).connect(fvFilter);
+    this.featureVoice.volume.value = -20;
     this.instrument = this.makeInstrument(this.instrumentId);
     for (let i = 0; i < 5; i++) {
       const panner = new Tone.Panner(0).connect(this.melodyCh);
@@ -133,6 +150,7 @@ class SoundEngine {
     this.melodyCh.volume.rampTo(gainToDb(l.melody), 0.05);
     this.textureCh.volume.rampTo(gainToDb(l.texture), 0.05);
     this.markerCh.volume.rampTo(gainToDb(l.markers), 0.05);
+    this.imageCh.volume.rampTo(gainToDb(l.image), 0.05);
   }
 
   /** Schedule one step's events at audio time `time`, lasting `stepSeconds`. */
@@ -142,8 +160,21 @@ class SoundEngine {
     for (const ev of events) {
       const at = time + ev.offset * stepSeconds;
       const dur = Math.max(0.06, ev.duration * stepSeconds);
+      if (ev.kind === 'scan' && ev.midi != null) {
+        const slot = this.scanPool[this.scanNext++ % this.scanPool.length];
+        slot.panner.pan.setValueAtTime(ev.pan ?? 0, at);
+        slot.synth.triggerAttackRelease(Tone.Frequency(ev.midi + 12, 'midi').toFrequency(), Math.min(dur, 0.35), at, ev.velocity ?? 0.5);
+        continue;
+      }
+      if (ev.kind === 'feature' && ev.midi != null) {
+        const f = Tone.Frequency(ev.midi - 12, 'midi').toFrequency();
+        if (!this.featureOn) { this.featureVoice.triggerAttack(f, at, ev.velocity ?? 0.4); this.featureOn = true; }
+        else this.featureVoice.setNote(f, at);
+        continue;
+      }
       if (ev.kind === 'marker') {
-        if (ev.marker === 'missing') this.gapSynth.triggerAttackRelease('C2', 0.15, at, 0.5);
+        if (ev.marker === 'turn') { this.markerSynth.triggerAttackRelease('E6', 0.12, at, 0.6); this.markerSynth.triggerAttackRelease('B6', 0.12, at + 0.09, 0.5); }
+        else if (ev.marker === 'missing') this.gapSynth.triggerAttackRelease('C2', 0.15, at, 0.5);
         else if (ev.marker === 'year' && mode === 'musical') this.markerSynth.triggerAttackRelease('C7', 0.03, at, 0.25);
         else if (ev.marker === 'zero') this.markerSynth.triggerAttackRelease('G6', 0.05, at, 0.5);
         continue;
@@ -193,10 +224,29 @@ class SoundEngine {
     this.instrument.releaseAll(now);
     this.drops.releaseAll(now);
     this.samplers.forEach((s) => s.synth.triggerRelease(now));
+    this.scanPool.forEach((s) => s.synth.triggerRelease(now));
+    if (this.featureOn) { this.featureVoice.triggerRelease(now); this.featureOn = false; }
     this.rainGain.gain.cancelScheduledValues(now);
     this.rainGain.gain.setValueAtTime(this.rainGain.gain.value, now);
     this.rainGain.gain.linearRampToValueAtTime(0, now + 0.15);
   }
+
+  /** Play one sweep (frame scan) of `seconds` duration starting now; returns the audio start time. */
+  async playSweep(events: SoundEvent[], seconds: number, mode: SoundMode): Promise<number | null> {
+    if (!(await this.start())) return null;
+    this.silence();
+    const t0 = Tone.now() + 0.08;
+    this.playStep(events, t0, seconds, mode);
+    return t0;
+  }
+
+  /** A single short tone for the audio cursor. */
+  async ping(ev: SoundEvent) {
+    if (!(await this.start())) return;
+    this.playStep([{ ...ev, offset: 0, duration: 1 }], Tone.now() + 0.01, 0.25, 'musical');
+  }
+
+  now() { return Tone.now(); }
 
   /** Audition legend examples (only used while the transport is paused). */
   async audition(events: SoundEvent[], mode: SoundMode) {

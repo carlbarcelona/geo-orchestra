@@ -1,4 +1,6 @@
-import type { AlignmentEvidence, ClimatologyLinkage, Observation, Selection, SoundEvent, VisualMediaManifest } from '../contracts';
+import type { AlignmentEvidence, ClimatologyLinkage, FrameScanDoc, Observation, Selection, SoundEvent, VisualMediaManifest } from '../contracts';
+import { describeCell, describeFrame } from '../a11y/braille';
+import { featureEvents, frameGrid, imergGrid, scanEvents, type ScanGrid } from '../sound/frameScan';
 import { ProjectFileSchema, type ProjectFile } from '../contracts';
 import { areaSelection, cellSelection, monthLabel, observationsFor, type Dataset } from '../data/dataset';
 import { buildSyntheticDemo, loadNasaSample, parseProcessedFile } from '../data/loaders';
@@ -20,6 +22,9 @@ controller.subscribe(() => {
   } else if (controller.adapterId === 'seasonal') {
     patch.visual = { ...s.visual, day: controller.index };
     preloadFrames(controller.index);
+    if (controller.state === 'playing' && s.a11y.describeEvery > 0 && controller.index !== s.visual.day && controller.index % s.a11y.describeEvery === 0) {
+      queueMicrotask(() => announceCurrent());
+    }
   }
   set(patch);
   if (s.a11y.announceSteps && controller.state === 'stopped') announceCurrent();
@@ -193,7 +198,9 @@ export function announceCurrent() {
   } else {
     const v = seasonalObservations()[s.visual.day];
     const f = s.media.manifest?.frames[s.visual.day];
-    if (v && f) announce(`${f.label}, seasonal average: ${v.value?.toFixed(3)} millimetres per hour`);
+    const ft = s.frameScan.doc?.days[s.visual.day];
+    if (ft && s.image.enabled) announce(describeFrame(ft, s.frameScan.doc!.days, v?.value ?? null));
+    else if (v && f) announce(`${f.label}, seasonal average: ${v.value?.toFixed(3)} millimetres per hour`);
   }
 }
 
@@ -272,6 +279,7 @@ export async function importVisualFeed() {
     set({ media: { state: 'ready', message: `${manifest.frames.length} dated frames`, manifest, alignment } });
     await loadFrame(get().visual.day).catch(() => undefined);
     preloadFrames(get().visual.day);
+    void loadFrameScan();
     announce(`NASA visual feed ready: ${manifest.title}. Measurements are not connected yet.`);
   } catch (e) {
     set({ media: { state: 'error', message: (e as Error).message, manifest: null, alignment: null } });
@@ -323,9 +331,111 @@ function seasonalEvents(): SoundEvent[][] {
     scale: sound.scale, pitchLow: sound.pitchLow, pitchHigh: sound.pitchHigh, spatialPhrases: false,
     datasetId: 'svs5478-clim', selectionId: obs[0]?.selectionId ?? '', stepLabel: (t) => `${labels[Number(t.slice(1)) - 1] ?? t} (seasonal average)`,
   });
-  return bucket(ev, obs.length);
+  const steps = bucket(ev, obs.length);
+  const { image, frameScan } = get();
+  if (image.enabled && frameScan.doc && frameScan.bytes) {
+    const feats = image.featureVoice ? featureEvents(frameScan.doc.days, { scale: sound.scale, pitchLow: sound.pitchLow, pitchHigh: sound.pitchHigh }) : [];
+    steps.forEach((step, i) => {
+      if (feats[i]) step.push(...feats[i]);
+      if (image.sweepEveryFrame) step.push(...scanEvents(frameGrid(frameScan.doc!, frameScan.bytes!, i), {
+        scale: sound.scale, pitchLow: sound.pitchLow, pitchHigh: sound.pitchHigh, stepIndex: i, t: `D${String(i + 1).padStart(3, '0')}`,
+        label: `${labels[i]} frame sweep`, datasetId: 'svs5478-frames', selectionId: 'frame', offsetStart: 0.05, span: 0.9,
+      }));
+    });
+  }
+  return steps;
 }
 export function seasonalEventsCached() { return seasonalEvents(); }
+
+// ------------------------------------------------------------------ image features: decoded frames, sweeps, audio cursor
+export async function loadFrameScan() {
+  const st = get().frameScan.state;
+  if (st === 'ready' || st === 'loading') return;
+  set({ frameScan: { state: 'loading', doc: null, bytes: null, message: 'Loading decoded frame data' } });
+  try {
+    const doc = await fetch(svsUrl('frame-features.json')).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() as Promise<FrameScanDoc>; });
+    const buf = await fetch(svsUrl(doc.grid.path)).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); });
+    const n = doc.days.length * doc.grid.nrow * doc.grid.ncol;
+    if (buf.byteLength !== n) throw new Error(`frame-scan size ${buf.byteLength} does not match ${n}`);
+    set({ frameScan: { state: 'ready', doc, bytes: new Uint8Array(buf), message: '' } });
+    if (controller.adapterId === 'seasonal') controller.updateEvents(seasonalEvents());
+  } catch (e) {
+    set({ frameScan: { state: 'error', doc: null, bytes: null, message: (e as Error).message } });
+  }
+}
+
+export function setImage(patch: Partial<ReturnType<typeof get>['image']>) {
+  set({ image: { ...get().image, ...patch } });
+  if (patch.sweepEveryFrame && get().visual.speed > 1) {
+    setSpeed(1);
+    announce('Sweep every frame is on: speed set to 1 day per second so each sweep can be heard.');
+  }
+  if (controller.adapterId === 'seasonal') controller.updateEvents(seasonalEvents());
+}
+
+/** The grid a sweep/explore acts on: decoded SVS frame (visual tab) or measured IMERG month (numerical tab). */
+export function currentScanGrid(): ScanGrid | null {
+  const s = get();
+  if (s.tab === 'visual') {
+    if (!s.image.enabled || !s.frameScan.doc || !s.frameScan.bytes || s.media.state !== 'ready') return null;
+    return frameGrid(s.frameScan.doc, s.frameScan.bytes, s.visual.day);
+  }
+  return s.dataset?.grid ? imergGrid(s.dataset.grid, s.cursor) : null;
+}
+
+export function currentScanEvents(): SoundEvent[] {
+  const s = get();
+  const g = currentScanGrid();
+  if (!g) return [];
+  const visual = s.tab === 'visual';
+  const t = visual ? `D${String(s.visual.day + 1).padStart(3, '0')}` : s.dataset!.months[s.cursor];
+  const label = visual ? `${s.media.manifest?.frames[s.visual.day]?.label ?? t} frame` : `${monthLabel(t)} map`;
+  return scanEvents(g, {
+    scale: s.sound.scale, pitchLow: s.sound.pitchLow, pitchHigh: s.sound.pitchHigh, stepIndex: 0, t, label,
+    datasetId: visual ? 'svs5478-frames' : s.dataset!.id, selectionId: 'frame',
+  });
+}
+
+let sweepTimer: ReturnType<typeof setTimeout> | null = null;
+/** Play one west-to-east sweep of the current frame/month (Hubble-style image sonification). */
+export async function scanCurrent() {
+  const events = currentScanEvents();
+  if (!events.length) { announce('Nothing to sweep yet: load the data or import the visual feed first.'); return; }
+  if (controller.state !== 'stopped') controller.pause('frame sweep');
+  const seconds = get().tab === 'visual' ? 4.5 : 3.5;
+  const t0 = await engine.playSweep(events, seconds, get().sound.mode);
+  if (t0 == null) { announce('Audio could not start.'); return; }
+  const startedAt = performance.now() + Math.max(0, (t0 - engine.now()) * 1000);
+  set({ sweep: { active: true, startedAt, seconds, tab: get().tab }, chartTab: 'score' });
+  announce(`Sweeping west to east over ${seconds} seconds. Higher pitch means farther north; louder means more rain.`);
+  if (sweepTimer) clearTimeout(sweepTimer);
+  sweepTimer = setTimeout(() => set({ sweep: null }), seconds * 1000 + 400);
+}
+
+/** Audio cursor: move to a cell, play its tone, announce its value, optionally vibrate. */
+export function exploreAt(row: number, col: number) {
+  const g = currentScanGrid();
+  if (!g) return;
+  const r = Math.max(0, Math.min(g.nrow - 1, row)), c = Math.max(0, Math.min(g.ncol - 1, col));
+  set({ explore: { row: r, col: c } });
+  const v = g.value(r, c);
+  const lat = +(g.latMin + (r + 0.5) * g.step).toFixed(2), lon = +(g.lonMin + (c + 0.5) * g.step).toFixed(2);
+  announce(describeCell(lat, lon, v, g.unit, g.derivation));
+  if (v == null) return;
+  const single: ScanGrid = { ...g, ncol: 1, lonMin: lon - g.step / 2, value: (rr) => (rr === r ? v : null) };
+  const ev = scanEvents(single, { scale: get().sound.scale, pitchLow: get().sound.pitchLow, pitchHigh: get().sound.pitchHigh,
+    stepIndex: 0, t: 'cursor', label: 'cursor', datasetId: 'cursor', selectionId: 'cursor' })[0];
+  if (ev) void engine.ping(ev);
+  if (get().a11y.haptics && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    try { navigator.vibrate(Math.round(10 + 70 * Math.sqrt(Math.min(1, v / g.refMax)))); } catch { /* unsupported */ }
+  }
+}
+export function exploreMove(dRow: number, dCol: number) {
+  const g = currentScanGrid();
+  if (!g) return;
+  const cur = get().explore ?? { row: Math.floor(g.nrow / 2), col: Math.floor(g.ncol / 2) };
+  exploreAt(cur.row + dRow, cur.col + dCol);
+}
 
 function attachSeasonal() {
   const s = get();

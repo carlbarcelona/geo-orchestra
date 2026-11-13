@@ -20,6 +20,7 @@ interface Props {
   emptyHint?: string;
   rightInfo?: React.ReactNode;
   footNote?: string;
+  score?: { label: string; node: React.ReactNode; available: boolean; events: SoundEvent[] };
 }
 
 const LOW = 48, HIGH = 84; // C3..C6 display range
@@ -50,8 +51,9 @@ export function MusicChart(p: Props) {
   const selected = useMemo(() => {
     if (!selectedId) return null;
     for (const step of p.events) for (const e of step) if (e.id === selectedId) return e;
+    for (const e of p.score?.events ?? []) if (e.id === selectedId) return e;
     return null;
-  }, [selectedId, p.events]);
+  }, [selectedId, p.events, p.score?.events]);
 
   useEffect(() => {
     if (tab !== 'roll') return;
@@ -201,6 +203,7 @@ export function MusicChart(p: Props) {
         <h2 className="panel-title" id="chart-title"><I.Note size={18} /> Music chart</h2>
         <div className="seg" role="tablist" aria-label="Music chart view">
           <button role="tab" aria-selected={tab === 'roll'} onClick={() => set({ chartTab: 'roll' })}>Piano roll</button>
+          {p.score && <button role="tab" aria-selected={tab === 'score'} onClick={() => set({ chartTab: 'score' })}>{p.score.label}</button>}
           <button role="tab" aria-selected={tab === 'details'} onClick={() => set({ chartTab: 'details' })}>Event details</button>
         </div>
         <div className="spacer" />
@@ -220,7 +223,9 @@ export function MusicChart(p: Props) {
           {p.rightInfo}
         </div>
       </div>
-      {!p.enabled ? (
+      {tab === 'score' && p.score ? (
+        <div className="chart-area" style={{ display: 'flex', flexDirection: 'column' }}>{p.score.node}</div>
+      ) : !p.enabled && !(tab === 'details' && selected) ? (
         <div className="panel-body"><div className="empty"><I.Note size={30} style={{ color: 'var(--note)' }} /><div className="big">{p.emptyTitle}</div>{p.emptyHint && <div className="italic">{p.emptyHint}</div>}</div></div>
       ) : tab === 'roll' ? (
         <div className="chart-area" ref={wrapRef}>
@@ -255,7 +260,9 @@ function EventDetails({ selected, current, label }: { selected: SoundEvent | nul
           <dl className="kv" key={e.id} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: 10 }}>
             <dt>Kind</dt><dd>{e.kind}{e.marker ? ` · ${e.marker}` : ''}</dd>
             <dt>Observation</dt><dd>{e.original.label}</dd>
-            <dt>Original value</dt><dd>{e.original.value == null ? 'missing' : `${e.original.value.toFixed(4)} ${e.original.unit}`}</dd>
+            <dt>Original value</dt><dd>{e.original.value == null ? 'missing' : e.kind === 'feature' ? `rain band ${e.original.value.toFixed(2)}° latitude` : `${e.original.value.toFixed(4)} ${e.original.unit}`}</dd>
+            {e.original.derivation && <><dt>Derivation</dt><dd>{e.original.derivation}{e.original.derivation === 'image-derived' ? ' (decoded from NASA colorbar, approximate)' : ''}</dd></>}
+            {e.scan && <><dt>Location</dt><dd>{e.scan.lat}°, {e.scan.lon}°E</dd></>}
             {e.midi != null && <><dt>Note</dt><dd>{e.note} (MIDI {e.midi}) · vel {e.velocity}</dd></>}
             {e.pan != null && e.kind === 'sample' && <><dt>Stereo pan</dt><dd>{e.pan}</dd></>}
             {e.texture && <><dt>Texture</dt><dd>{e.texture.dropsPerSecond} drops/s · intensity {e.texture.intensity}</dd></>}

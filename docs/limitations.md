@@ -9,7 +9,8 @@
 | EIC synchronization with measurements | **Partial:** the linkage is a *reconstruction* from monthly IMERG, not the SVS daily data. It is labelled approximate. |
 | 100 ms visual/audio sync target | Implemented and instrumented. **Not verified on a foreground display** (see verification.md). |
 | Hybrid mode, staff notation, MIDI/WAV export, CSV import, region drawing | Not in this release |
-| Image-feature sonification | Deliberately disabled. It would not be a rainfall measurement. |
+| Image-feature sonification | Delivered as **image-derived** values decoded from NASA's colorbar (r = 0.97 against the reconstruction). Always labelled approximate and kept separate from measurements. |
+| Braille charts on refreshable displays | Implemented with Unicode braille. **Not verified on hardware.** |
 
 Other notes:
 - Values are monthly mean **rates** (mm/hr). The app shows x24 for mm/day but does not convert to monthly accumulation.

@@ -1,0 +1,62 @@
+import { useEffect, useMemo } from 'react';
+import { monthLabel } from './data/dataset';
+import { numericalEvents } from './state/actions';
+import { useStore } from './state/store';
+import { DatasetPanel } from './ui/numerical/DatasetPanel';
+import { ProjectPanel } from './ui/numerical/ProjectPanel';
+import { SoundPanel } from './ui/numerical/SoundPanel';
+import { MusicChart } from './ui/shared/MusicChart';
+import { Dialogs, Header, LiveRegion, StatusBar, SubBar, useShortcuts } from './ui/shell/Shell';
+import { VisualWorkspace } from './ui/visual/VisualWorkspace';
+
+const MONTH_SPEEDS = [
+  { value: 0.5, label: '0.5 month/s' }, { value: 1, label: '1 month/s' }, { value: 2, label: '2 months/s' },
+  { value: 4, label: '4 months/s' }, { value: 12, label: '12 months/s' },
+];
+
+function NumericalWorkspace() {
+  const ds = useStore((s) => s.dataset);
+  const selection = useStore((s) => s.selection);
+  const cursor = useStore((s) => s.cursor);
+  const range = useStore((s) => s.range);
+  const speed = useStore((s) => s.speed);
+  const cache = useStore((s) => s.eventsCache);
+  const events = useMemo(() => (ds && selection ? numericalEvents() : []), [ds, selection, cache]); // eslint-disable-line react-hooks/exhaustive-deps
+  const labels = useMemo(() => ds?.months.map((t) => monthLabel(t)) ?? [], [ds]);
+  return (
+    <main id="main" className="workspace numerical" aria-label="Numerical workspace">
+      <ProjectPanel />
+      <DatasetPanel />
+      <SoundPanel />
+      <MusicChart
+        events={events} stepLabels={labels} axisTitle="Observation month (UTC)" cursor={cursor} range={range}
+        speeds={MONTH_SPEEDS} speed={speed} visibleSteps={12} enabled={!!ds && !!selection && events.length > 0}
+        emptyTitle="Load observations to generate notes"
+        rightInfo={ds && <span className="muted hide-sm">Range: {monthLabel(ds.months[range[0]])} – {monthLabel(ds.months[range[1]])} · {range[1] - range[0] + 1} months ≈ {Math.round((range[1] - range[0] + 1) / speed)} s</span>}
+      />
+    </main>
+  );
+}
+
+export function App() {
+  const tab = useStore((s) => s.tab);
+  const a11y = useStore((s) => s.a11y);
+  useShortcuts();
+  useEffect(() => {
+    const r = document.documentElement;
+    r.dataset.contrast = a11y.highContrast ? 'high' : 'normal';
+    r.dataset.large = String(a11y.largeText);
+    r.dataset.motion = a11y.reducedMotion ? 'reduced' : 'full';
+  }, [a11y]);
+  return (
+    <div className="app">
+      <a href="#main" className="skip-link">Skip to workspace</a>
+      <Header />
+      <SubBar />
+      {tab === 'numerical' ? <NumericalWorkspace /> : <VisualWorkspace />}
+      <StatusBar />
+      <Dialogs />
+      <LiveRegion />
+    </div>
+  );
+}

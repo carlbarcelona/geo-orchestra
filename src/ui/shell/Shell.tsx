@@ -1,0 +1,187 @@
+import { useEffect, useRef, useState } from 'react';
+import { controller } from '../../playback/controller';
+import { MAPPING } from '../../sound/mapping';
+import { audition, openProject, saveProject, setTab, stepBy, togglePlay, toggleLoop } from '../../state/actions';
+import { set, useStore } from '../../state/store';
+import * as I from '../icons';
+
+export function Header() {
+  const ds = useStore((s) => s.dataset);
+  const tab = useStore((s) => s.tab);
+  const media = useStore((s) => s.media);
+  const link = useStore((s) => s.link);
+  const load = useStore((s) => s.load);
+  const openRef = useRef<HTMLInputElement>(null);
+  const [toast, setToast] = useState<string[] | null>(null);
+  let status = '';
+  if (tab === 'numerical') status = load.state === 'loading' ? 'Loading…' : !ds ? 'Before import' : ds.kind === 'synthetic' ? 'SYNTHETIC DEMO · not NASA data' : ds.kind === 'nasa' ? `NASA IMERG V07B · ${ds.months.length} months` : 'Imported file';
+  else status = media.state !== 'ready' ? 'Media not loaded' : link.state === 'reconstructed' ? 'NASA SVS frames · reconstructed linkage' : 'NASA SVS frames · measurements not connected';
+  return (
+    <header className="header">
+      <div className="brand">
+        <I.Logo />
+        <div><div className="brand-name">GeoOrchestra</div><div className="brand-sub">Earth Information Jukebox</div></div>
+      </div>
+      <div className="header-divider" />
+      <div className="project-title"><I.Folder /> Philippines · Rainfall</div>
+      <span className="spacer" />
+      <span className={`header-status ${ds?.kind === 'synthetic' && tab === 'numerical' ? 'synthetic' : ''}`} role="status">{status}</span>
+      <button className="btn" onClick={saveProject}><I.Save /> Save project</button>
+      <button className="btn" onClick={() => openRef.current?.click()}><I.Open /> Open</button>
+      <input ref={openRef} type="file" accept=".json,application/json" hidden aria-label="Open project file"
+        onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setToast(await openProject(f)); }} />
+      <button className="btn access" onClick={() => set({ dialogs: { ...useStore.getState().dialogs, a11y: true } })}><I.Access /> Accessibility</button>
+      {toast && <div className="toast" role="status"><div className="row"><b>Project</b><span className="spacer" /><button className="btn small ghost" onClick={() => setToast(null)} aria-label="Dismiss"><I.X /></button></div>{toast.map((t) => <div key={t} className="dim" style={{ fontSize: 12.5 }}>{t}</div>)}</div>}
+    </header>
+  );
+}
+
+export function SubBar() {
+  const tab = useStore((s) => s.tab);
+  const ds = useStore((s) => s.dataset);
+  const load = useStore((s) => s.load);
+  const media = useStore((s) => s.media);
+  const link = useStore((s) => s.link);
+  return (
+    <nav className="subbar" aria-label="Workspaces">
+      <div className="ws-tabs" role="tablist" aria-label="Workspace">
+        <button role="tab" className="ws-tab" aria-selected={tab === 'numerical'} onClick={() => setTab('numerical')}>Numerical</button>
+        <button role="tab" className="ws-tab" aria-selected={tab === 'visual'} onClick={() => setTab('visual')}>Visual feed</button>
+      </div>
+      <div className="header-divider" style={{ height: 22 }} />
+      {tab === 'numerical' ? (
+        <>
+          <span className="chip"><I.Rain size={14} /> IMERG Monthly V07B</span>
+          {ds ? <span className={`chip ${ds.kind === 'synthetic' ? 'amber' : 'ok'}`}><span className="dot" /> {ds.kind === 'synthetic' ? 'Synthetic' : 'Loaded'} · {ds.months.length} months</span>
+            : <span className="chip"><span className="dot" style={{ background: 'transparent', border: '1.5px solid currentColor' }} /> {load.state === 'loading' ? 'Loading' : 'Not loaded'}</span>}
+        </>
+      ) : (
+        <>
+          <span className="chip accent"><I.Link size={14} /> NASA SVS / EIC</span>
+          <span className="chip note">Seasonal climatology</span>
+          {media.state === 'ready' && <span className={`chip ${link.state === 'reconstructed' ? 'amber' : ''}`}>{link.state === 'reconstructed' ? 'Linkage: reconstructed (approximate)' : 'Linkage: not connected'}</span>}
+        </>
+      )}
+    </nav>
+  );
+}
+
+export function StatusBar() {
+  const tab = useStore((s) => s.tab);
+  const media = useStore((s) => s.media);
+  const link = useStore((s) => s.link);
+  const lag = useStore((s) => s.lag);
+  const pauseReason = useStore((s) => s.pauseReason);
+  const playback = useStore((s) => s.playback);
+  return (
+    <footer className="statusbar">
+      <I.Info />
+      {tab === 'numerical' ? <span>One clock · Table · Map · Graph · audio · chart follow the same observation</span>
+        : <span>Media: {media.state === 'ready' ? 'Imported' : 'Not imported'} · Numerical link: {link.state === 'reconstructed' ? 'Reconstructed' : 'Not connected'}</span>}
+      {playback === 'stopped' && pauseReason && ['page hidden', 'end of range', 'audio unavailable', 'a NASA frame failed to load'].includes(pauseReason) && <span className="chip" style={{ fontSize: 11 }}>{pauseReason}</span>}
+      <span className="spacer" />
+      <span className="hide-sm"><span className="kbd">Space</span> Play/Pause · <span className="kbd">L</span> Loop · <span className="kbd">←</span><span className="kbd">→</span> Step</span>
+      {lag.samples > 0 && <span className="hide-sm mono" title="Delay between scheduled audio time and visual highlight (target ≤ 100 ms)">sync {lag.mean.toFixed(0)}/{lag.max.toFixed(0)} ms</span>}
+      <button className="btn small ghost" onClick={() => set({ dialogs: { ...useStore.getState().dialogs, sources: true } })}><I.Database /> NASA data sources</button>
+    </footer>
+  );
+}
+
+export function LiveRegion() {
+  const ann = useStore((s) => s.announcement);
+  return <div className="sr-only" role="status" aria-live="polite" aria-atomic="true" key={ann.id}>{ann.text}</div>;
+}
+
+/** Global keyboard shortcuts (ignored while typing in a field). */
+export function useShortcuts() {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('input, select, textarea, [contenteditable="true"]') || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === ' ' && !t.closest('button, a, [role="tab"]')) { e.preventDefault(); void togglePlay(); }
+      else if (e.key === 'l' || e.key === 'L') toggleLoop();
+      else if (e.key === 'ArrowRight' && !t.closest('[role="tablist"]')) { e.preventDefault(); stepBy(1); }
+      else if (e.key === 'ArrowLeft' && !t.closest('[role="tablist"]')) { e.preventDefault(); stepBy(-1); }
+      else if (e.key === 'Home') controller.seek(controller.range[0]);
+      else if (e.key === 'End') controller.seek(controller.range[1]);
+      else if (e.key === '?') set({ dialogs: { ...useStore.getState().dialogs, shortcuts: true } });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+}
+
+function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    ref.current?.querySelector<HTMLElement>('button, [href], input, select')?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('keydown', onKey); prev?.focus(); };
+  }, [onClose]);
+  return (
+    <div className="dialog-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="dialog" role="dialog" aria-modal="true" aria-label={title} ref={ref}>
+        <div className="panel-head"><h2>{title}</h2><span className="spacer" /><button className="btn small ghost" onClick={onClose} aria-label="Close dialog"><I.X /></button></div>
+        <div className="panel-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+export function Dialogs() {
+  const d = useStore((s) => s.dialogs);
+  const a11y = useStore((s) => s.a11y);
+  const mode = useStore((s) => s.sound.mode);
+  const close = (k: keyof typeof d) => () => set({ dialogs: { ...useStore.getState().dialogs, [k]: false } });
+  const setA = (p: Partial<typeof a11y>) => set({ a11y: { ...a11y, ...p } });
+  return (
+    <>
+      {d.a11y && (
+        <Dialog title="Accessibility" onClose={close('a11y')}>
+          <p>Every measurement is readable without audio in Table view and Event details. Keyboard: <span className="kbd">Space</span> play/pause, <span className="kbd">L</span> loop, <span className="kbd">←</span>/<span className="kbd">→</span> previous/next observation, <span className="kbd">Home</span>/<span className="kbd">End</span> range start/end, <span className="kbd">?</span> shortcuts.</p>
+          <label className="row" style={{ padding: '6px 0' }}><input type="checkbox" checked={a11y.reducedMotion} onChange={(e) => setA({ reducedMotion: e.target.checked })} /> Reduced motion (piano roll moves step by step, no smooth scrolling)</label>
+          <label className="row" style={{ padding: '6px 0' }}><input type="checkbox" checked={a11y.highContrast} onChange={(e) => setA({ highContrast: e.target.checked })} /> High contrast</label>
+          <label className="row" style={{ padding: '6px 0' }}><input type="checkbox" checked={a11y.largeText} onChange={(e) => setA({ largeText: e.target.checked })} /> Larger text and numbers</label>
+          <label className="row" style={{ padding: '6px 0' }}><input type="checkbox" checked={a11y.announceSteps} onChange={(e) => setA({ announceSteps: e.target.checked })} /> Announce the value when stepping while paused</label>
+          <p style={{ marginTop: 10 }}>Screen readers hear actions and status changes (play, pause, buffering, dataset loaded, selection) but not every frame during playback. The map has a keyboard alternative: the region selector and the coordinate picker in Map view.</p>
+          <p>Accessibility checks performed: keyboard-only walkthrough, focus visibility, contrast of text tokens, labelled controls. Not yet validated with blind or low-vision participants.</p>
+        </Dialog>
+      )}
+      {d.legend && (
+        <Dialog title="Audio legend" onClose={close('legend')}>
+          <p>Playback pauses while you audition. Current mode: <b>{mode === 'musical' ? 'Musical sonification' : 'Geophony'}</b>. These examples use the same fixed mapping ({MAPPING.version}) as playback.</p>
+          {([
+            ['low', 'Low rainfall', '0.05 mm/hr → low, soft note · sparse drops'],
+            ['middle', 'Middle', '0.40 mm/hr → middle register · steady rain'],
+            ['high', 'High rainfall', '1.20 mm/hr → high, loud note · dense rain'],
+            ['zero', 'Zero (measured)', '0 mm/hr → lowest note plus a bright “zero” tick'],
+            ['missing', 'Missing', 'No measurement → no note, a muted thud, rain fades out'],
+          ] as const).map(([k, label, desc]) => (
+            <div className="legend-row" key={k}>
+              <b>{label}</b><span className="dim" style={{ fontSize: 12.5 }}>{desc}</span>
+              <button className="btn small primary" onClick={() => void audition(k)} aria-label={`Play legend example: ${label}`}><I.Play size={13} /> Play</button>
+            </div>
+          ))}
+          <p style={{ marginTop: 10 }}>Sounds are designed mappings of satellite estimates, not recordings. Instrument and volume change the timbre and loudness only, never the underlying values.</p>
+        </Dialog>
+      )}
+      {d.sources && (
+        <Dialog title="NASA data sources & credits" onClose={close('sources')}>
+          <p><b>Measurements:</b> GPM IMERG Final Precipitation L3 1 month 0.1° V07B (GPM_3IMERGM), NASA GES DISC, doi:10.5067/GPM/IMERG/3B-MONTH/07. Philippines subset retrieved through Earthdata Cloud OPeNDAP, prepared with <span className="mono">pipeline/prepare_imerg.py</span>. Unit: mm/hr (monthly mean rate).</p>
+          <p><b>Visual feed:</b> NASA Scientific Visualization Studio, “IMERG Daily Precipitation Climatology (2001–2022)”, ID 5478 (Earth Information Center). Visualizer Alex Kekesi; scientists George Huffman and Jackson Tan. Frames are authentic SVS images resized/cropped for the web; originals at <a href="https://svs.gsfc.nasa.gov/5478/" target="_blank" rel="noreferrer">svs.gsfc.nasa.gov/5478</a>.</p>
+          <p><b>Maps in the Numerical workspace</b> are rendered by GeoOrchestra from the IMERG numbers — they are not NASA imagery.</p>
+          <p><b>Boundaries:</b> Natural Earth 10m admin-0/admin-1 v5.1.2 (public domain).</p>
+          <p><b>Honesty notes:</b> satellite precipitation estimates carry uncertainty (random error shown in Table); missing is never treated as zero; seasonal climatology frames are not historical events; the visual-feed linkage is a reconstruction from monthly data, not the SVS daily product.</p>
+          <p className="muted"><a href="https://www.spaceappschallenge.org/2026/challenges/the-earth-information-jukebox/" target="_blank" rel="noreferrer">NASA Space Apps 2026 — The Earth Information Jukebox</a></p>
+        </Dialog>
+      )}
+      {d.shortcuts && (
+        <Dialog title="Keyboard shortcuts" onClose={close('shortcuts')}>
+          <dl className="kv"><dt>Space</dt><dd>Play / pause</dd><dt>L</dt><dd>Loop on/off</dd><dt>← →</dt><dd>Previous / next observation</dd><dt>Home / End</dt><dd>Range start / end</dd><dt>?</dt><dd>This list</dd><dt>Esc</dt><dd>Close dialogs</dd></dl>
+        </Dialog>
+      )}
+    </>
+  );
+}

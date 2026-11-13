@@ -1,0 +1,68 @@
+{
+  "generated": "2026-11-13T18:27:39+00:00",
+  "expectedMonths": 295,
+  "presentMonths": 295,
+  "missingMonths": [],
+  "unexpectedMonths": [],
+  "duplicates": 0,
+  "ordered": true,
+  "unit": "mm/hr",
+  "gridShape": [
+    295,
+    170,
+    115
+  ],
+  "missingCells": 0,
+  "valueRange": [
+    0.0,
+    3.578000068664551
+  ],
+  "spotChecks": [
+    {
+      "month": "2000-06",
+      "lat": 13.15,
+      "lon": 122.05,
+      "source": 0.338,
+      "processed": 0.338,
+      "match": true
+    },
+    {
+      "month": "2010-07",
+      "lat": 14.55,
+      "lon": 121.05,
+      "source": 0.552,
+      "processed": 0.552,
+      "match": true
+    },
+    {
+      "month": "2013-11",
+      "lat": 11.25,
+      "lon": 124.95,
+      "source": 0.511,
+      "processed": 0.511,
+      "match": true
+    },
+    {
+      "month": "2024-12",
+      "lat": 7.05,
+      "lon": 125.55,
+      "source": 0.311,
+      "processed": 0.311,
+      "match": true
+    },
+    {
+      "month": "2024-01",
+      "lat": 4.55,
+      "lon": 116.05,
+      "source": 0.235,
+      "processed": 0.235,
+      "match": true
+    }
+  ],
+  "regionCells": {
+    "philippines": 2441,
+    "luzon": 1177,
+    "visayas": 452,
+    "mindanao": 811
+  }
+}

@@ -122,6 +122,12 @@ const GEO_WORDS: Record<AnomalyCategory, string> = {
  * Used by the caption strip, screen-reader announcements, narration and the Event details.
  */
 export function explainStep(events: SoundEvent[], mode: 'musical' | 'geophony', label: string, unit = 'mm/hr'): string {
+  const cue = events.find((e) => e.marker === 'checkpoint' || e.marker === 'time')?.timeCue;
+  const pre = !cue ? '' : cue.unit === 'checkpoint' ? `Checkpoint “${cue.label}” · ` : `${cue.label[0].toUpperCase()}${cue.label.slice(1)} · `;
+  return pre + explainMeasurement(events, mode, label, unit);
+}
+
+function explainMeasurement(events: SoundEvent[], mode: 'musical' | 'geophony', label: string, unit: string): string {
   const missing = events.find((e) => e.marker === 'missing');
   const main = events.find((e) => e.kind === 'melody' && e.id.endsWith('#m0')) ?? events.find((e) => e.kind === 'melody') ?? events.find((e) => e.kind === 'texture');
   const ctx = (main ?? missing ?? events.find((e) => e.kind === 'reference'))?.context;

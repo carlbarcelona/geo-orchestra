@@ -97,10 +97,12 @@ export interface SoundEvent {
   velocity?: number;     // 0..1
   pan?: number;          // -1..1
   texture?: { dropsPerSecond: number; intensity: number; brightness: number };
-  marker?: 'missing' | 'zero' | 'year' | 'clipped' | 'turn' | 'extreme' | 'region';
+  marker?: 'missing' | 'zero' | 'year' | 'clipped' | 'turn' | 'extreme' | 'region' | 'time' | 'checkpoint';
   scan?: { col: number; row: number; lat: number; lon: number; beat?: number; latBand?: [number, number]; intensity?: string };
   chord?: number[];      // MIDI notes of a harmony event
-  cue?: 'thunder' | 'wind';
+  cue?: 'thunder' | 'wind';   // geophony effect for much wetter / much drier than normal
+  /** time cue (cue-v1): marks a passing period or a user checkpoint; independent of the measurements */
+  timeCue?: { unit: 'step' | 'week' | 'month' | 'quarter' | 'year' | 'checkpoint'; sound: 'woodblock' | 'bell' | 'click' | 'drum' | 'chime'; accent: 'normal' | 'medium' | 'strong'; label: string };
   context?: StepContext;
   mappingVersion: string;
   explanation: string;
@@ -177,6 +179,12 @@ export const ProcessedFileSchema = z.object({
 export type ProcessedFile = z.infer<typeof ProcessedFileSchema>;
 
 // ---------- Project file ----------
+const CheckpointSchema = z.object({ key: z.string(), label: z.string() });
+const CueSoundSchema = z.enum(['woodblock', 'bell', 'click', 'drum', 'chime']);
+const TimeCueSettingsSchema = z.object({
+  unit: z.enum(['off', 'step', 'week', 'month', 'quarter', 'year']), everyN: z.number().int().min(1).max(100), checkpoints: z.boolean(),
+  sound: CueSoundSchema, checkpointSound: CueSoundSchema, accentLarger: z.boolean(),
+});
 export const ProjectFileSchema = z.object({
   format: z.literal('geoorchestra-project'),
   version: z.literal(1),
@@ -194,5 +202,8 @@ export const ProjectFileSchema = z.object({
   visual: z.object({ imported: z.boolean(), linked: z.boolean(), regionId: z.string(), day: z.number(), mode: z.enum(['frame', 'timelapse']), roi: z.boolean(), speed: z.number() }),
   a11y: z.any(),
   uiMode: z.enum(['preset', 'advanced']).optional(), // added with rain-v2; older project files omit it
+  // added with cue-v1; older project files omit them
+  checkpoints: z.object({ numerical: z.array(CheckpointSchema), visual: z.array(CheckpointSchema) }).optional(),
+  timeCues: z.object({ numerical: TimeCueSettingsSchema, visual: TimeCueSettingsSchema }).optional(),
 });
 export type ProjectFile = z.infer<typeof ProjectFileSchema>;

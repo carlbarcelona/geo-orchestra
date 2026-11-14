@@ -4,7 +4,7 @@ import { currentObservations, numericalEvents, updateSound } from '../../state/a
 import { useStore } from '../../state/store';
 import * as I from '../icons';
 import { BrailleChart } from '../shared/BrailleChart';
-import { Disclosure, InstrumentRow, LayerLevels, LegendButton, MappingRows, MasterVolume, ModeTabs, PitchRange, ScaleRow } from '../shared/SoundControls';
+import { Disclosure, InstrumentRow, LayerLevels, LegendButton, MappingRows, MasterVolume, ModeTabs, PitchRange, ScaleRow, TimeCueControls } from '../shared/SoundControls';
 
 export function SoundPanel() {
   const ds = useStore((s) => s.dataset);
@@ -42,6 +42,7 @@ export function SoundPanel() {
           <MappingRows />
           <LayerLevels />
         </Disclosure>
+        <Disclosure title="Time cues & checkpoints"><TimeCueControls /></Disclosure>
         <div style={{ marginBottom: 10 }}><LegendButton /></div>
 
         {o && (

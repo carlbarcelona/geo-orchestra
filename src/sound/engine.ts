@@ -11,7 +11,7 @@ export const INSTRUMENTS: { id: InstrumentId; label: string }[] = [
   { id: 'marimba', label: 'Marimba' },
 ];
 
-export interface LayerLevels { melody: number; texture: number; markers: number; image: number; context: number }
+export interface LayerLevels { melody: number; texture: number; markers: number; image: number; context: number; time: number }
 
 function gainToDb(g: number) { return g <= 0.0001 ? -Infinity : 20 * Math.log10(g); }
 
@@ -45,6 +45,12 @@ class SoundEngine {
   private windEnv!: Tone.AmplitudeEnvelope;
   private windFilter!: Tone.Filter;
   private windNoise!: Tone.Noise;
+  private timeCh!: Tone.Channel;
+  private cueWood!: Tone.MembraneSynth;
+  private cueDrum!: Tone.MembraneSynth;
+  private cueBell!: Tone.FMSynth;
+  private cueClick!: Tone.NoiseSynth;
+  private cueChime!: Tone.PolySynth;
   private scanPool: { panner: Tone.Panner; synth: Tone.Synth }[] = [];
   private scanNext = 0;
   private featureVoice!: Tone.Synth;
@@ -60,7 +66,7 @@ class SoundEngine {
   private dropFilter!: Tone.Filter;
   private markerSynth!: Tone.Synth;
   private gapSynth!: Tone.MembraneSynth;
-  private levels: LayerLevels = { melody: 0.8, texture: 0.75, markers: 0.5, image: 0.7, context: 0.55 };
+  private levels: LayerLevels = { melody: 0.8, texture: 0.75, markers: 0.5, image: 0.7, context: 0.55, time: 0.6 };
   private masterGain = 0.8;
   available = true;
   lastError: string | null = null;
@@ -137,6 +143,18 @@ class SoundEngine {
     this.windFilter = new Tone.Filter({ type: 'bandpass', frequency: 500, Q: 1.8 }).connect(this.windEnv);
     this.windNoise = new Tone.Noise('white').connect(this.windFilter);
     this.windNoise.volume.value = -10;
+    // time cues (cue-v1): dry percussive voices on their own layer, heard in both modes
+    this.timeCh = new Tone.Channel({ volume: gainToDb(this.levels.time) }).connect(this.master);
+    this.cueWood = new Tone.MembraneSynth({ pitchDecay: 0.008, octaves: 1.5, envelope: { attack: 0.001, decay: 0.07, sustain: 0, release: 0.03 } }).connect(this.timeCh);
+    this.cueWood.volume.value = -6;
+    this.cueDrum = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 4, envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.1 } }).connect(this.timeCh);
+    this.cueDrum.volume.value = -4;
+    this.cueBell = new Tone.FMSynth({ harmonicity: 5.1, modulationIndex: 12, envelope: { attack: 0.001, decay: 0.5, sustain: 0, release: 0.3 }, modulationEnvelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.2 } } as any).connect(this.timeCh);
+    this.cueBell.volume.value = -14;
+    this.cueClick = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.02, sustain: 0, release: 0.01 } }).connect(this.timeCh);
+    this.cueClick.volume.value = -12;
+    this.cueChime = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'sine' }, envelope: { attack: 0.002, decay: 0.35, sustain: 0, release: 0.2 } }).connect(this.timeCh);
+    this.cueChime.volume.value = -12;
     this.built = true;
   }
 
@@ -182,6 +200,29 @@ class SoundEngine {
     this.markerCh.volume.rampTo(gainToDb(l.markers), 0.05);
     this.imageCh.volume.rampTo(gainToDb(l.image), 0.05);
     this.contextCh.volume.rampTo(gainToDb(l.context ?? 0.55), 0.05);
+    this.timeCh.volume.rampTo(gainToDb(l.time ?? 0.6), 0.05);
+  }
+
+  /** One time cue at audio time `at`. A strong accent is louder and doubled 90 ms later. */
+  private playCue(cue: NonNullable<SoundEvent['timeCue']>, at: number) {
+    const vel = cue.accent === 'strong' ? 1 : cue.accent === 'medium' ? 0.75 : 0.5;
+    const hit = (t: number, v: number) => {
+      switch (cue.sound) {
+        case 'drum': this.cueDrum.triggerAttackRelease('C2', 0.15, t, v); break;
+        case 'bell': this.cueBell.triggerAttackRelease('E6', 0.2, t, v); break;
+        case 'click': this.cueClick.triggerAttackRelease(0.02, t, v); break;
+        case 'chime': this.cueChime.triggerAttackRelease(['G5', 'C6'], 0.15, t, v); break;
+        default: this.cueWood.triggerAttackRelease('G5', 0.05, t, v);
+      }
+    };
+    hit(at, vel);
+    if (cue.accent === 'strong') hit(at + 0.09, vel * 0.85);
+  }
+
+  /** Preview one cue now (legend / settings), without touching playback. */
+  async auditionCue(cue: NonNullable<SoundEvent['timeCue']>) {
+    if (!(await this.start())) return;
+    this.playCue(cue, Tone.now() + 0.03);
   }
 
   /** Schedule one step's events at audio time `time`, lasting `stepSeconds`. */
@@ -218,7 +259,8 @@ class SoundEngine {
       if (ev.kind === 'marker') {
         if (ev.marker === 'turn') { this.markerSynth.triggerAttackRelease('E6', 0.12, at, 0.6); this.markerSynth.triggerAttackRelease('B6', 0.12, at + 0.09, 0.5); }
         else if (ev.marker === 'missing') this.gapSynth.triggerAttackRelease('C2', 0.15, at, 0.5);
-        else if (ev.marker === 'year' && mode === 'musical') this.markerSynth.triggerAttackRelease('C7', 0.03, at, 0.25);
+        else if ((ev.marker === 'time' || ev.marker === 'checkpoint') && ev.timeCue) this.playCue(ev.timeCue, at);
+        // 'year' markers stay in the event list (marker lane) but are heard through the time-cue layer
         else if (ev.marker === 'zero') this.markerSynth.triggerAttackRelease('G6', 0.05, at, 0.5);
         else if (ev.marker === 'extreme') { this.bell.triggerAttackRelease('A5', 0.3, at, 0.55); this.bell.triggerAttackRelease('E6', 0.3, at + 0.14, 0.45); }
         else if (ev.marker === 'region') this.markerSynth.triggerAttackRelease('C7', 0.02, at, 0.18);

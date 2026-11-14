@@ -4,7 +4,7 @@ import { speechAvailable, stopSpeaking } from '../../a11y/speech';
 import { NORMAL } from '../../sound/context';
 import { MAPPING } from '../../sound/mapping';
 import { SCAN } from '../../sound/frameScan';
-import { audition, openProject, saveProject, scanCurrent, setTab, setUiMode, stepBy, togglePlay, toggleLoop, type LegendKind } from '../../state/actions';
+import { audition, auditionCue, openProject, saveProject, scanCurrent, setTab, setUiMode, stepBy, toggleCheckpoint, togglePlay, toggleLoop, type LegendKind } from '../../state/actions';
 import { set, useStore } from '../../state/store';
 import * as I from '../icons';
 
@@ -103,7 +103,7 @@ export function StatusBar() {
         : <span>Media: {media.state === 'ready' ? 'Imported' : 'Not imported'} · Numerical link: {link.state === 'reconstructed' ? 'Reconstructed' : 'Not connected'}</span>}
       {playback === 'stopped' && pauseReason && ['page hidden', 'end of range', 'audio unavailable', 'a NASA frame failed to load'].includes(pauseReason) && <span className="chip" style={{ fontSize: 11 }}>{pauseReason}</span>}
       <span className="spacer" />
-      <span className="hide-sm"><span className="kbd">Space</span> Play/Pause · <span className="kbd">L</span> Loop · <span className="kbd">←</span><span className="kbd">→</span> Step</span>
+      <span className="hide-sm"><span className="kbd">Space</span> Play/Pause · <span className="kbd">L</span> Loop · <span className="kbd">C</span> Checkpoint · <span className="kbd">←</span><span className="kbd">→</span> Step</span>
       {lag.samples > 0 && <span className="hide-sm mono" title="Delay between scheduled audio time and visual highlight (target ≤ 100 ms)">sync {lag.mean.toFixed(0)}/{lag.max.toFixed(0)} ms</span>}
       <button className="btn small ghost" onClick={() => set({ dialogs: { ...useStore.getState().dialogs, sources: true } })}><I.Database /> NASA data sources</button>
     </footer>
@@ -119,11 +119,13 @@ export function LiveRegion() {
 export function useShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
+      // key events dispatched on window/document have no element target; treat them as page-level keys
+      const t = e.target instanceof Element ? e.target : document.body;
       if (t.closest('input, select, textarea, [contenteditable="true"]') || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === ' ' && !t.closest('button, a, [role="tab"]')) { e.preventDefault(); void togglePlay(); }
       else if (e.key === 'l' || e.key === 'L') toggleLoop();
       else if (e.key === 's' || e.key === 'S') void scanCurrent();
+      else if (e.key === 'c' || e.key === 'C') toggleCheckpoint();
       else if (e.key === 'ArrowRight' && !t.closest('[role="tablist"]')) { e.preventDefault(); stepBy(1); }
       else if (e.key === 'ArrowLeft' && !t.closest('[role="tablist"]')) { e.preventDefault(); stepBy(-1); }
       else if (e.key === 'Home') controller.seek(controller.range[0]);
@@ -219,6 +221,12 @@ export function Dialogs() {
             Pitch = <b>latitude</b> (each note is a 2.5° band: C4 ≈ 2.5–5°N, the Philippines is about D4–D5) · loudness = <b>rain class</b> (light, moderate, heavy, very heavy) ·
             silence = <b>dry</b> · a sweep is <b>{SCAN.beats} beats from west to east</b>, with a soft tick on the beats over the Philippine sector. Press <span className="kbd">S</span> to hear the current frame.
           </p>
+          <h3 className="legend-h">4 · When are we? (time cues)</h3>
+          <p className="dim" style={{ fontSize: 12.5, margin: '0 0 6px' }}>A short knock marks time passing, in both Musical and Geophony. In Preset mode it marks every new year (Numerical) or every new month (Visual feed); Advanced lets you choose the period and the sound. Press <span className="kbd">C</span> to set your own checkpoint.</p>
+          <div className="legend-row"><b>Time passes</b><span className="dim" style={{ fontSize: 12.5 }}>one knock at the start of the period</span>
+            <button className="btn small primary" onClick={() => auditionCue('period')} aria-label="Play legend example: time cue"><I.Play size={13} /> Play</button></div>
+          <div className="legend-row"><b>Your checkpoint</b><span className="dim" style={{ fontSize: 12.5 }}>the same knock, louder and doubled</span>
+            <button className="btn small primary" onClick={() => auditionCue('checkpoint')} aria-label="Play legend example: checkpoint cue"><I.Play size={13} /> Play</button></div>
           <p style={{ marginTop: 10 }}>Sounds are designed mappings of satellite estimates, not recordings. Instrument and volume change the timbre and loudness only, never the underlying values.</p>
         </Dialog>
       )}
@@ -234,7 +242,7 @@ export function Dialogs() {
       )}
       {d.shortcuts && (
         <Dialog title="Keyboard shortcuts" onClose={close('shortcuts')}>
-          <dl className="kv"><dt>Space</dt><dd>Play / pause</dd><dt>L</dt><dd>Loop on/off</dd><dt>S</dt><dd>Sweep the current frame / month west → east</dd><dt>Arrows on frame</dt><dd>Explore cell by cell (Shift = 5°)</dd><dt>← →</dt><dd>Previous / next observation</dd><dt>Home / End</dt><dd>Range start / end</dd><dt>?</dt><dd>This list</dd><dt>Esc</dt><dd>Close dialogs</dd></dl>
+          <dl className="kv"><dt>Space</dt><dd>Play / pause</dd><dt>L</dt><dd>Loop on/off</dd><dt>S</dt><dd>Sweep the current frame / month west → east</dd><dt>C</dt><dd>Add or remove a checkpoint at the current step</dd><dt>Arrows on frame</dt><dd>Explore cell by cell (Shift = 5°)</dd><dt>← →</dt><dd>Previous / next observation</dd><dt>Home / End</dt><dd>Range start / end</dd><dt>?</dt><dd>This list</dd><dt>Esc</dt><dd>Close dialogs</dd></dl>
         </Dialog>
       )}
     </>

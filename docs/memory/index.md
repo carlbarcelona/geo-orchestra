@@ -6,3 +6,4 @@ write one. Each line below gives a note's title, then why someone would open it.
 <!-- - [Title](slug.md): the hook, in one line. -->
 - [Preset mode is the first-run default](preset-mode-first-run-default.md): what goes in Preset vs Advanced, and what both must keep.
 - [Normal baseline is 2001–2022](normal-baseline-2001-2022.md): why the rain-v2 "normal" matches SVS 5478's years.
+- [YouTube pages give titles only](youtube-pages-give-titles-only.md): what an agent can and can't learn from a shared video link.

@@ -52,7 +52,7 @@ export interface AppState {
   selectedEventId: string | null;
   chartTab: 'roll' | 'score' | 'details';
   /** image features (decoded SVS frames) */
-  frameScan: { state: 'none' | 'loading' | 'ready' | 'error'; doc: FrameScanDoc | null; bytes: Uint8Array | null; message: string };
+  frameScan: { state: 'none' | 'loading' | 'ready' | 'error'; doc: FrameScanDoc | null; bytes: Uint8Array | null; globalBytes: Uint8Array | null; message: string };
   image: { enabled: boolean; sweepEveryFrame: boolean; featureVoice: boolean };
   sweep: { active: boolean; startedAt: number; seconds: number; tab: Tab } | null;
   explore: { row: number; col: number } | null;
@@ -60,7 +60,9 @@ export interface AppState {
   /** visual feed */
   media: { state: MediaState; message: string; manifest: VisualMediaManifest | null; alignment: AlignmentEvidence | null };
   link: { state: LinkState; message: string; climatology: ClimatologyLinkage | null };
-  visual: { day: number; mode: 'frame' | 'timelapse'; roi: boolean; fit: 'fit' | 'fill'; regionId: string; speed: number; fullscreen: boolean };
+  visual: { day: number; mode: 'frame' | 'timelapse'; roi: boolean; fit: 'fit' | 'fill'; regionId: string; speed: number; fullscreen: boolean;
+    /** user crop of the whole frame for sweeps (degrees); null = sweep the entire frame */
+    crop: { lonMin: number; lonMax: number; latMin: number; latMax: number } | null; cropping: boolean };
   a11y: A11ySettings;
   dialogs: { a11y: boolean; legend: boolean; sources: boolean; shortcuts: boolean };
   announcement: { text: string; id: number };
@@ -101,14 +103,14 @@ export const useStore = create<AppState>(() => ({
   sound: DEFAULT_SOUND,
   selectedEventId: null,
   chartTab: 'roll',
-  frameScan: { state: 'none', doc: null, bytes: null, message: '' },
+  frameScan: { state: 'none', doc: null, bytes: null, globalBytes: null, message: '' },
   image: { enabled: true, sweepEveryFrame: false, featureVoice: true },
   sweep: null,
   explore: null,
   graphTab: 'describe',
   media: { state: 'none', message: '', manifest: null, alignment: null },
   link: { state: 'none', message: '', climatology: null },
-  visual: { day: 0, mode: 'timelapse', roi: false, fit: 'fit', regionId: 'philippines', speed: 10, fullscreen: false },
+  visual: { day: 0, mode: 'timelapse', roi: false, fit: 'fit', regionId: 'philippines', speed: 10, fullscreen: false, crop: null, cropping: false },
   a11y: { reducedMotion: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches, highContrast: false, largeText: false, announceSteps: false, brailleCharts: true, describeEvery: 15, haptics: true, speak: false },
   dialogs: { a11y: false, legend: false, sources: false, shortcuts: false },
   announcement: { text: '', id: 0 },

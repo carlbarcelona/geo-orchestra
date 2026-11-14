@@ -275,3 +275,12 @@ table.data tr.missing td { color: var(--text-3); }
   .statusbar .hide-sm, .hide-sm { display: none; }
   .subbar { overflow-x: auto; }
 }
+
+/* ---------- Frame sweep (scan-v3): scan line, rain systems, crop ---------- */
+.system-tag { position: absolute; pointer-events: none; background: rgba(8, 19, 29, 0.88); border: 1px solid; border-radius: 6px; padding: 3px 7px; font-size: 11.5px; color: var(--text); white-space: nowrap; transform: translateY(-100%); z-index: 3; }
+.system-tag .dim { font-size: 10.5px; }
+.crop-layer { position: absolute; inset: 0; cursor: crosshair; z-index: 4; background: rgba(0, 0, 0, 0.25); touch-action: none; }
+.crop-hint { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 6px; padding: 4px 10px; font-size: 12px; pointer-events: none; }
+.crop-box { position: absolute; border: 2px dashed #f5b942; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35); pointer-events: none; }
+.crop-box.drawing { box-shadow: none; background: rgba(245, 185, 66, 0.12); }
+.crop-box span { position: absolute; left: 0; top: -22px; background: var(--panel-2); border: 1px solid #f5b942; border-radius: 5px; padding: 1px 6px; font-size: 11px; white-space: nowrap; color: var(--text); }

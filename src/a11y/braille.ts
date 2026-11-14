@@ -102,5 +102,11 @@ export function describeSweep(events: SoundEvent[], beats: number): string {
   parts.push(`The tune sits mostly on ${common.join(' and ')}.`);
   parts.push(`The loudest note is beat ${loud.scan!.beat! + 1}: ${loud.scan!.intensity} rain near ${dir(loud.scan!.lat)}.`);
   if (region.length) parts.push(`Beats ${beatList(region)} cover the Philippine sector (soft tick).`);
+  const systems = events.filter((e) => e.kind === 'system' && e.system);
+  if (systems.length) {
+    const big = systems.reduce((a, b) => (b.system!.cells > a.system!.cells ? b : a));
+    const trop = systems.filter((e) => e.system!.zone === 'tropical').length;
+    parts.push(`The line crosses ${systems.length} rain system${systems.length === 1 ? '' : 's'} (${trop} tropical, ${systems.length - trop} mid-latitude), each a held pad; the largest is system ${big.system!.id} near ${dir(big.system!.lat)}, ${big.system!.intensity} at its peak.`);
+  }
   return parts.join(' ');
 }

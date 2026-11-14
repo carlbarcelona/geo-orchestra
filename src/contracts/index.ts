@@ -67,7 +67,7 @@ export interface Observation {
 }
 
 // ---------- 3. Sound event ----------
-export type SoundEventKind = 'melody' | 'sample' | 'texture' | 'marker' | 'scan' | 'feature' | 'reference' | 'chord';
+export type SoundEventKind = 'melody' | 'sample' | 'texture' | 'marker' | 'scan' | 'feature' | 'reference' | 'chord' | 'system';
 
 /** How a value compares with its reference ("normal"). Wetter/drier categories are designed listening aids, not new measurements. */
 export type AnomalyCategory = 'much-drier' | 'drier' | 'near-normal' | 'wetter' | 'much-wetter';
@@ -99,6 +99,7 @@ export interface SoundEvent {
   texture?: { dropsPerSecond: number; intensity: number; brightness: number };
   marker?: 'missing' | 'zero' | 'year' | 'clipped' | 'turn' | 'extreme' | 'region';
   scan?: { col: number; row: number; lat: number; lon: number; beat?: number; latBand?: [number, number]; intensity?: string };
+  system?: { id: number; zone: 'tropical' | 'extratropical'; lat: number; lon: number; lonRange: [number, number]; latRange: [number, number]; cells: number; peak: number; orientation: number; intensity: string };
   chord?: number[];      // MIDI notes of a harmony event
   cue?: 'thunder' | 'wind';
   context?: StepContext;
@@ -147,6 +148,7 @@ export interface FrameFeature {
 export interface FrameScanDoc {
   contract: 'frame-scan'; version: number; unit: 'mm/day'; source: string;
   grid: { ncol: number; nrow: number; lonMin: number; latMin: number; step: number; scale: number; unknown: number; layout: string; path: string };
+  globalGrid?: { ncol: number; nrow: number; lonMin: number; latMin: number; step: number; scale: number; unknown: number; layout: string; path: string; unknownPixelPct: number };
   thresholds: { wetMmDay: number; sectorLon: [number, number]; phBox: [number, number, number, number] };
   decodeValidation: { colorbarRoundTripMaxErrorMmDay: number; unknownPixelPct: number; vsReconstructedClimatology: { pearsonR: number; meanBiasMmDay: number } };
   days: FrameFeature[];

@@ -33,7 +33,7 @@
   4. Apply a trailing 30-day mean.
 - This is not the SVS daily product, and the app never labels it as exact.
 
-## Automated checks (`npm test`, 74 passing on 15 Nov 2026)
+## Automated checks (`npm test`, 86 passing on 15 Nov 2026)
 - Missing vs zero
 - No change computed across gaps
 - cos-latitude aggregation, coverage threshold and mask
@@ -49,6 +49,16 @@
   - captions for compared, missing, zero, no-normal and seasonal steps
   - on the shipped Philippine record: every month has a category, the split is 12 / 93 / 100 / 65 / 25, 14 unusual months, at least 10 distinct melody notes
 - `scan-v2` (tests/framescan.test.ts): the 16-band latitude table, rain classes, 11 beats with at most 2 notes each, dry beats are rests, Philippine-sector ticks, and the same note for the same latitude in the sweep, the band voice and the cursor
+- Time cues `cue-v1` (tests/timecues.test.ts):
+  - Preset cues fall on every January (monthly) and on every month's 1st across the 366-day SVS cycle, including Mar 01 after Feb 29.
+  - Quarters, weeks, every step and every N.
+  - The accent for larger periods.
+  - A checkpoint replaces the ordinary cue and is accented.
+  - Unknown keys are ignored; output is deterministic and independent of the data.
+  - Captions start with "Checkpoint …" or "New year …".
+  - Preset mode always uses the fixed cue.
+  - Toggling a checkpoint never changes data, selection or range.
+  - Project files with and without checkpoints parse, and an unknown cue sound is rejected.
 - Preset / Advanced (tests/presets.test.ts): first visit is Preset; switching mode and applying listening presets never change data, selection or range; edits make a preset "custom"; project files with and without `uiMode` parse; legend examples land in their stated categories
 - Controller behavior:
   - seek cancels stale ticks and draws
@@ -102,3 +112,13 @@ The console showed no application errors.
 - Visual feed in Preset: one button imported the frames, connected the reconstructed climatology and played. **S** drew the Frame score with 11 numbered beats, notes on the note/latitude axis and the Philippine beats shaded.
 - No console errors.
 - **Not verified:** how it sounds on speakers (hum level, chord balance, thunder and wind cues), narration voices, and the 1180 px / 720 px layouts. These need a listening session on the demo laptop.
+
+## Time cues and checkpoints (15 Nov 2026, Claude in Chrome, localhost)
+
+- Preset Numerical: Start listening, then pause and step.
+  - Pressing C at Jan 2001 added a checkpoint. It showed as a chip, a flag in the piano roll and a dotted line on the graph, and the caption read "Checkpoint “Jan 2001” · Jan 2001 · 0.225 mm/hr · close to a normal January…".
+  - At Jan 2002 the caption read "New year · Jan 2002 · …".
+- Advanced: set "Mark every" to quarter with a drum. At Apr 2001 the caption read "New quarter · Apr 2001 · …". Switching back to Preset removed the quarter cue (year-only again) without stopping anything.
+- Preset Visual feed: one click opened and played. Jan 01 and Feb 01 start with "New month", and Jan 02 has no cue.
+- No application errors once real key events are used. A synthetic key event sent to `window` crashed the shortcut handler; it now treats such events as page-level keys.
+- **Not verified:** how the cues sound on speakers (knock loudness against the hum and the rain), and the save → open round trip in the browser. The schema is unit-tested.

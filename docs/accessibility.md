@@ -11,6 +11,10 @@
 - **Preset mode (default):** fewer controls, one-click start, region buttons, a "What you hear" guide and listening presets. Advanced shows everything. The switch is a labelled button group at the right of the workspace tabs.
 - **Captions:** a "Now hearing" strip states the value, how it compares with normal and what the sounds mean. It is not a live region (to avoid chatter); the same text is announced on pause and step.
 - **Narration (opt-in):** Accessibility → "Speak summaries aloud" uses the browser's speech engine on pause and step, and during playback only for unusual months and rain-band turns. It may overlap a screen reader, so it is off by default.
+- **Time cues and checkpoints:** a knock marks each new year (Numerical) or month (Visual feed) in both sound modes, so the passing of time can be followed by ear.
+  - `C` adds or removes a checkpoint at the current step, and each change is announced.
+  - The checkpoint list in Advanced has labelled inputs and jump and remove buttons.
+  - Checkpoint labels appear in the caption and are spoken during playback when narration is on.
 - **Colour is never the only cue:** wetter and drier notes also carry ▲ / ▼, and the caption says it in words.
 - **Display options:** Reduced motion (the piano roll moves step by step; this follows `prefers-reduced-motion` by default), High contrast, and Larger text.
 - **Audio:**

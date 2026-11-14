@@ -16,7 +16,7 @@ Every sound event records its date, its location or aggregation, the original va
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 74 checks of the risky transformations
+npm test           # 86 checks of the risky transformations
 npm run build && npm run preview
 ```
 
@@ -30,6 +30,8 @@ A **Preset | Advanced** switch sits at the right of the Numerical | Visual feed 
   - Numerical: a **Start listening** button (loads the NASA sample, selects the Philippines, plays from Jun 2000), region buttons, three listening presets, a "What you hear" guide, the graph with its normal line, and a "Now hearing" caption.
   - Visual feed: one **Open NASA rainfall animation** button imports the frames, connects the climatology and plays.
 - **Advanced** is the full interface: instruments, scales, pitch range, every mapping and layer, metadata, coordinates, alignment evidence.
+
+**Time cues:** a knock marks each new year (Numerical) or each new month (Visual feed) in both Musical and Geophony. Press `C` to set a checkpoint, which plays a doubled knock. In Advanced you can choose the period, every N, the sounds and accents (see the mapping guide, `cue-v1`).
 
 Switching only changes which controls are shown, never the data or playback. The honesty labels (reconstructed linkage, seasonal average, image-derived) are shown in both modes.
 
@@ -49,7 +51,7 @@ Switching only changes which controls are shown, never the data or playback. The
    - Focus the frame and use the arrow keys to explore it cell by cell.
    - The **Describe** tab explains the frame in words and shows **braille charts** for refreshable braille displays.
 
-Keyboard: `Space` play/pause · `L` loop · `S` sweep · `←/→` step · arrows on the frame explore · `Home/End` · `?`.
+Keyboard: `Space` play/pause · `L` loop · `S` sweep · `C` checkpoint · `←/→` step · arrows on the frame explore · `Home/End` · `?`.
 
 ## Data preparation (reproducible)
 

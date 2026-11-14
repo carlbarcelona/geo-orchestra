@@ -17,6 +17,8 @@ export interface SoundSettings {
   pitchHigh: number;
   master: number;
   layers: LayerLevels;
+  /** Per-element mute; independent of the level so unmuting restores it. */
+  muted: Record<keyof LayerLevels, boolean>;
   spatialPhrases: boolean;
   preset: 'rain-pitch' | 'rain-pitch-spatial';
 }
@@ -59,7 +61,8 @@ export interface AppState {
 
 export const DEFAULT_SOUND: SoundSettings = {
   mode: 'musical', instrument: 'soft-piano', scale: 'C pentatonic', pitchLow: 48, pitchHigh: 84, master: 0.8,
-  layers: { melody: 0.8, texture: 0.75, markers: 0.5, image: 0.7 }, spatialPhrases: false, preset: 'rain-pitch',
+  layers: { melody: 0.8, texture: 0.75, markers: 0.5, image: 0.7 },
+  muted: { melody: false, texture: false, markers: false, image: false }, spatialPhrases: false, preset: 'rain-pitch',
 };
 
 export const useStore = create<AppState>(() => ({

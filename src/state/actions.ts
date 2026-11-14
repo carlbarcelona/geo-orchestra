@@ -5,7 +5,7 @@ import { ProjectFileSchema, type ProjectFile } from '../contracts';
 import { areaSelection, cellSelection, monthLabel, observationsFor, type Dataset } from '../data/dataset';
 import { buildSyntheticDemo, loadNasaSample, parseProcessedFile } from '../data/loaders';
 import { controller, type TimelineAdapter } from '../playback/controller';
-import { engine, type InstrumentId, type SoundMode } from '../sound/engine';
+import { engine, type InstrumentId, type LayerLevels, type SoundMode } from '../sound/engine';
 import { generateEvents, type SampleSeries } from '../sound/mapping';
 import { announce, DEFAULT_SOUND, get, set, type DataView, type SoundSettings, type Tab } from './store';
 
@@ -205,13 +205,30 @@ export function announceCurrent() {
 }
 
 // ------------------------------------------------------------------ sound settings
+export const ELEMENT_LABELS: Record<keyof LayerLevels, string> = { melody: 'Melody', texture: 'Rain texture', markers: 'Markers', image: 'Frame sweep & band' };
+/** Which mixer elements actually sound in each mode (markers and image layers are shared). */
+export const MODE_ELEMENTS: Record<SoundMode, (keyof LayerLevels)[]> = { musical: ['melody', 'markers', 'image'], geophony: ['texture', 'markers', 'image'] };
+/** Levels the engine should apply: muted elements go to zero without losing their slider value. */
+export function mixLevels(s: SoundSettings): LayerLevels {
+  const m = s.muted ?? DEFAULT_SOUND.muted;
+  return { melody: m.melody ? 0 : s.layers.melody, texture: m.texture ? 0 : s.layers.texture, markers: m.markers ? 0 : s.layers.markers, image: m.image ? 0 : s.layers.image };
+}
+export function toggleMute(k: keyof LayerLevels) {
+  const muted = get().sound.muted;
+  updateSound({ muted: { ...muted, [k]: !muted[k] } });
+}
+
 export function updateSound(patch: Partial<SoundSettings>) {
   const before = get().sound;
   const sound = { ...before, ...patch };
   set({ sound });
   if (patch.instrument) engine.setInstrument(patch.instrument as InstrumentId);
   if (patch.master != null) engine.setMaster(sound.master);
-  if (patch.layers) engine.setLevels(sound.layers);
+  if (patch.layers || patch.muted) engine.setLevels(mixLevels(sound));
+  if (patch.muted) {
+    const changed = (Object.keys(patch.muted) as (keyof LayerLevels)[]).find((k) => patch.muted![k] !== before.muted[k]);
+    if (changed) announce(`${ELEMENT_LABELS[changed]} ${sound.muted[changed] ? 'muted' : 'on'}`);
+  }
   if (patch.mode) { controller.setMode(patch.mode as SoundMode); announce(`${patch.mode === 'musical' ? 'Musical sonification' : 'Geophony'} mode`); }
   if (patch.scale != null || patch.pitchLow != null || patch.pitchHigh != null || patch.spatialPhrases != null) {
     set({ eventsCache: null });
@@ -493,8 +510,8 @@ export async function openProject(file: File): Promise<string[]> {
     doc = parsed.data;
   } catch (e) { return [`Could not read ${file.name}: ${(e as Error).message}`]; }
   controller.pause('project opened');
-  set({ sound: { ...DEFAULT_SOUND, ...doc.sound }, speed: doc.speed, loop: doc.loop, view: doc.view, a11y: { ...get().a11y, ...doc.a11y } });
-  engine.setInstrument(get().sound.instrument); engine.setMaster(get().sound.master); engine.setLevels(get().sound.layers);
+  set({ sound: { ...DEFAULT_SOUND, ...doc.sound, muted: { ...DEFAULT_SOUND.muted, ...(doc.sound?.muted ?? {}) } }, speed: doc.speed, loop: doc.loop, view: doc.view, a11y: { ...get().a11y, ...doc.a11y } });
+  engine.setInstrument(get().sound.instrument); engine.setMaster(get().sound.master); engine.setLevels(mixLevels(get().sound));
   controller.setLoop(doc.loop);
   if (doc.dataset?.kind === 'nasa') await loadNasa();
   else if (doc.dataset?.kind === 'synthetic') await loadSynthetic();

@@ -4,6 +4,7 @@ import { MAPPING } from '../../sound/mapping';
 import { audition, openProject, saveProject, scanCurrent, setTab, stepBy, togglePlay, toggleLoop } from '../../state/actions';
 import { set, useStore } from '../../state/store';
 import * as I from '../icons';
+import { ElementMutes } from '../shared/SoundControls';
 
 export function Header() {
   const ds = useStore((s) => s.dataset);
@@ -171,6 +172,9 @@ export function Dialogs() {
               <button className="btn small primary" onClick={() => void audition(k)} aria-label={`Play legend example: ${label}`}><I.Play size={13} /> Play</button>
             </div>
           ))}
+          <h3 style={{ fontSize: 14, margin: '14px 0 4px' }}>Elements in this mode</h3>
+          <p className="muted" style={{ fontSize: 12.5 }}>Turn an element off to hear the others on their own, in playback and in these examples. Its level is kept for when you turn it back on.</p>
+          <ElementMutes />
           <p style={{ marginTop: 10 }}>Sounds are designed mappings of satellite estimates, not recordings. Instrument and volume change the timbre and loudness only, never the underlying values.</p>
         </Dialog>
       )}

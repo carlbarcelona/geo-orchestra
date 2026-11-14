@@ -4,7 +4,7 @@ import { currentObservations, numericalEvents, updateSound } from '../../state/a
 import { useStore } from '../../state/store';
 import * as I from '../icons';
 import { BrailleChart } from '../shared/BrailleChart';
-import { Disclosure, InstrumentRow, LayerLevels, LegendButton, MappingRows, MasterVolume, ModeTabs, PitchRange, ScaleRow } from '../shared/SoundControls';
+import { Disclosure, ElementMutes, GeophonyMapping, InstrumentRow, LayerLevels, LegendButton, MappingRows, MasterVolume, ModeBanner, ModeTabs, ModeTag, PitchRange, ScaleRow } from '../shared/SoundControls';
 
 export function SoundPanel() {
   const ds = useStore((s) => s.dataset);
@@ -20,26 +20,27 @@ export function SoundPanel() {
   const tex = stepEvents.find((e) => e.kind === 'texture');
 
   return (
-    <section className="panel" aria-labelledby="sound-title">
-      <div className="panel-head"><h2 className="panel-title" id="sound-title"><I.Note size={18} /> Sound</h2></div>
+    <section className={`panel sound-mode-${sound.mode}`} aria-labelledby="sound-title">
+      <div className="panel-head"><h2 className="panel-title" id="sound-title">{sound.mode === 'musical' ? <I.Note size={18} /> : <I.Wave size={18} />} Sound</h2><span className="spacer" /><ModeTag /></div>
       <div className="panel-body">
         <div className="callout info" style={{ marginBottom: 10 }}>
           <div className="txt italic" style={{ fontSize: 12.5 }}>{selection ? <>Source: <b style={{ fontStyle: 'normal', color: 'var(--text)' }}>{selection.label}</b> · {selection.type === 'area' ? 'area mean' : 'single cell'}{ds?.kind === 'synthetic' ? ' · SYNTHETIC' : ''}</> : 'Source: awaiting measurements'}</div>
         </div>
-        <div style={{ marginBottom: 10 }}><ModeTabs /></div>
-        <InstrumentRow />
-        <div className="field">
+        <div style={{ marginBottom: 8 }}><ModeTabs /></div>
+        <div style={{ marginBottom: 10 }}><ModeBanner /></div>
+        {sound.mode === 'musical' && <InstrumentRow />}
+        {sound.mode === 'musical' && <div className="field">
           <label htmlFor="preset">Mapping preset</label>
           <select id="preset" value={sound.preset} onChange={(e) => updateSound({ preset: e.target.value as typeof sound.preset, spatialPhrases: e.target.value === 'rain-pitch-spatial' })}>
             <option value="rain-pitch">Rainfall → Pitch</option>
             <option value="rain-pitch-spatial">Rainfall → Pitch + spatial phrases</option>
           </select>
-        </div>
+        </div>}
         <MasterVolume />
+        <div className="dim" style={{ fontSize: 12 }}>Elements (click to mute)</div>
+        <ElementMutes />
         <Disclosure title="Advanced mappings">
-          <ScaleRow />
-          <PitchRange />
-          <MappingRows />
+          {sound.mode === 'musical' ? <><ScaleRow /><PitchRange /><MappingRows /></> : <GeophonyMapping />}
           <LayerLevels />
         </Disclosure>
         <div style={{ marginBottom: 10 }}><LegendButton /></div>

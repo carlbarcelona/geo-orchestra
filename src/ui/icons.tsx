@@ -25,6 +25,7 @@ export const Link = ({ size, ...p }: P) => <svg {...base(size)} {...p}><path d="
 export const External = ({ size, ...p }: P) => <svg {...base(size)} {...p}><path d="M14 4h6v6" /><path d="M20 4 10 14" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>;
 export const Search = ({ size, ...p }: P) => <svg {...base(size)} {...p}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>;
 export const Volume = ({ size, ...p }: P) => <svg {...base(size)} {...p}><path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11" /></svg>;
+export const VolumeOff = ({ size, ...p }: P) => <svg {...base(size)} {...p}><path d="M4 9v6h4l5 4V5L8 9z" /><path d="m16 9 6 6M22 9l-6 6" /></svg>;
 export const Rain = ({ size, ...p }: P) => <svg {...base(size)} {...p}><path d="M7 15a4 4 0 0 1 .5-8 5 5 0 0 1 9.5 1.5A3.5 3.5 0 0 1 17 15z" /><path d="M8 18l-1 2M12 18l-1 2M16 18l-1 2" /></svg>;
 export const Wave = ({ size, ...p }: P) => <svg {...base(size)} {...p}><path d="M4 12h1M7 8v8M10 5v14M13 9v6M16 7v10M19 11v2" /></svg>;
 export const Arrows = ({ size, ...p }: P) => <svg {...base(size)} {...p}><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4" /></svg>;

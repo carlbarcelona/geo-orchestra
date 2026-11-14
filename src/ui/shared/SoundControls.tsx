@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { INSTRUMENTS, type InstrumentId } from '../../sound/engine';
+import { INSTRUMENTS, type InstrumentId, type LayerLevels as Levels } from '../../sound/engine';
 import { midiToName, SCALES } from '../../sound/mapping';
-import { updateSound } from '../../state/actions';
+import { ELEMENT_LABELS, MODE_ELEMENTS, toggleMute, updateSound } from '../../state/actions';
 import { set, useStore } from '../../state/store';
 import * as I from '../icons';
 
@@ -64,16 +64,71 @@ export function MasterVolume() {
   );
 }
 
+const LAYER_ROWS: [keyof Levels, string][] = [['melody', 'Melody layer'], ['texture', 'Rain texture'], ['markers', 'Markers'], ['image', 'Frame sweep & band']];
+
+/** Speaker toggle for one mixer element; the slider value is kept while muted. */
+export function MuteButton({ k }: { k: keyof Levels }) {
+  const muted = useStore((st) => st.sound.muted[k]);
+  const name = ELEMENT_LABELS[k];
+  return (
+    <button type="button" className={`mute-btn${muted ? ' on' : ''}`} aria-pressed={muted} onClick={() => toggleMute(k)} aria-label={`Mute ${name}`} title={muted ? `Unmute ${name}` : `Mute ${name}`}>
+      {muted ? <I.VolumeOff size={14} /> : <I.Volume size={14} />}
+    </button>
+  );
+}
+
+/** Level sliders for the layers heard in the current mode, each with a mute toggle. */
 export function LayerLevels() {
   const layers = useStore((st) => st.sound.layers);
-  const row = (k: keyof typeof layers, label: string) => (
-    <div className="field" key={k} style={{ gridTemplateColumns: '110px 1fr 40px' }}>
-      <label htmlFor={`lvl-${k}`}>{label}</label>
-      <input id={`lvl-${k}`} type="range" min={0} max={1} step={0.01} value={layers[k]} onChange={(e) => updateSound({ layers: { ...layers, [k]: Number(e.target.value) } })} />
-      <span className="mono">{layers[k].toFixed(2)}</span>
+  const muted = useStore((st) => st.sound.muted);
+  const mode = useStore((st) => st.sound.mode);
+  return (
+    <>
+      {LAYER_ROWS.filter(([k]) => MODE_ELEMENTS[mode].includes(k)).map(([k, label]) => (
+        <div className="field" key={k} style={{ gridTemplateColumns: '26px 96px 1fr 36px', opacity: muted[k] ? 0.6 : 1 }}>
+          <MuteButton k={k} />
+          <label htmlFor={`lvl-${k}`}>{label}</label>
+          <input id={`lvl-${k}`} type="range" min={0} max={1} step={0.01} value={layers[k]} onChange={(e) => updateSound({ layers: { ...layers, [k]: Number(e.target.value) } })} />
+          <span className="mono">{muted[k] ? 'off' : layers[k].toFixed(2)}</span>
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** On/off chips for every element heard in the current mode. */
+export function ElementMutes() {
+  const mode = useStore((st) => st.sound.mode);
+  const muted = useStore((st) => st.sound.muted);
+  return (
+    <div className="element-mutes" role="group" aria-label={`Sound elements in ${mode === 'musical' ? 'Musical' : 'Geophony'} mode`}>
+      {MODE_ELEMENTS[mode].map((k) => (
+        <button key={k} type="button" className={`chip mute-chip${muted[k] ? ' off' : ''}`} aria-pressed={!muted[k]} onClick={() => toggleMute(k)}
+          title={muted[k] ? `Unmute ${ELEMENT_LABELS[k]}` : `Mute ${ELEMENT_LABELS[k]}`}>
+          {muted[k] ? <I.VolumeOff size={12} /> : <I.Volume size={12} />} {ELEMENT_LABELS[k]}
+        </button>
+      ))}
     </div>
   );
-  return <>{row('melody', 'Melody layer')}{row('texture', 'Rain texture')}{row('markers', 'Markers')}{row('image', 'Frame sweep & band')}</>;
+}
+
+/** Colour-coded statement of the current sound mode, so it is never ambiguous. */
+export function ModeBanner() {
+  const mode = useStore((st) => st.sound.mode);
+  return (
+    <div className={`mode-banner ${mode}`}>
+      {mode === 'musical' ? <I.Note size={18} /> : <I.Wave size={18} />}
+      <div>
+        <div className="mode-name">{mode === 'musical' ? 'Musical mode' : 'Geophony mode'}</div>
+        <div className="mode-desc">{mode === 'musical' ? 'Rainfall plays as notes on an instrument.' : 'Rainfall plays as a rain soundscape: noise bed and droplets.'}</div>
+      </div>
+    </div>
+  );
+}
+
+export function ModeTag() {
+  const mode = useStore((st) => st.sound.mode);
+  return <span className={`mode-tag ${mode}`}>{mode === 'musical' ? 'Musical' : 'Geophony'}</span>;
 }
 
 export function MappingRows({ compact }: { compact?: boolean }) {
@@ -93,6 +148,16 @@ export function MappingRows({ compact }: { compact?: boolean }) {
         </select>
       </div>
       <p className="muted" style={{ fontSize: 11.5, margin: '0 0 6px' }}>Mappings are fixed across dates and regions (version rain-v1). Changing instrument or scale never changes the measurements.</p>
+    </div>
+  );
+}
+
+export function GeophonyMapping() {
+  return (
+    <div style={{ fontSize: 13 }}>
+      <div className="field" style={{ gridTemplateColumns: '20px 1fr 20px 1.2fr' }}><I.Rain /><span>Rainfall</span><span>→</span><span>Rain loudness &amp; brightness</span></div>
+      <div className="field" style={{ gridTemplateColumns: '20px 1fr 20px 1.2fr' }}><I.Wave /><span>Rainfall &amp; change</span><span>→</span><span>Droplets per second</span></div>
+      <p className="muted" style={{ fontSize: 11.5, margin: '0 0 6px' }}>Instrument, scale and pitch range apply to Musical mode only.</p>
     </div>
   );
 }

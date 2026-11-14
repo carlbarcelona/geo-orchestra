@@ -38,6 +38,7 @@ function NumericalWorkspace() {
         events={events} stepLabels={labels} axisTitle="Observation month (UTC)" cursor={cursor} range={range}
         speeds={MONTH_SPEEDS} speed={speed} visibleSteps={12} enabled={!!ds && !!selection && events.length > 0}
         emptyTitle={preset ? 'Press “Start listening” to hear the rainfall' : 'Load observations to generate notes'}
+        checkpointKey={(i) => ds?.months[i] ?? ''}
         score={preset ? undefined : {
           label: 'Map score', available: !!grid, events: scanEv,
           node: <FrameScore grid={grid} events={scanEv} tab="numerical" title={`Map score · ${ds ? monthLabel(ds.months[cursor]) : ''} · measured IMERG (0.5° cells)`} emptyText="Load the NASA sample to turn each month's map into a score" />,

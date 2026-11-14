@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { INSTRUMENTS, type InstrumentId } from '../../sound/engine';
 import { NORMAL } from '../../sound/context';
 import { MAPPING, midiToName, scaleNotes, SCALES, stepSize } from '../../sound/mapping';
-import { updateSound } from '../../state/actions';
+import { auditionCue, jumpToCheckpoint, removeCheckpoint, renameCheckpoint, setTimeCues, toggleCheckpoint, updateSound } from '../../state/actions';
+import { CUE_SOUNDS, cueSpacingSeconds, UNIT_LABEL, UNITS, type CueSound, type CueUnit } from '../../sound/timeCues';
 import { set, useStore } from '../../state/store';
 import * as I from '../icons';
 
@@ -77,7 +78,7 @@ export function LayerLevels() {
       <span className="mono">{layers[k].toFixed(2)}</span>
     </div>
   );
-  return <>{row('melody', 'Melody layer')}{row('context', 'Normal & cues')}{row('texture', 'Rain texture')}{row('markers', 'Markers')}{row('image', 'Frame sweep & band')}</>;
+  return <>{row('melody', 'Melody layer')}{row('context', 'Normal & cues')}{row('time', 'Time cues')}{row('texture', 'Rain texture')}{row('markers', 'Markers')}{row('image', 'Frame sweep & band')}</>;
 }
 
 export function MappingRows({ compact }: { compact?: boolean }) {
@@ -136,5 +137,74 @@ export function Disclosure({ title, children, defaultOpen = false, extra }: { ti
       </div>
       {open && <div style={{ padding: '4px 2px 8px' }}>{children}</div>}
     </>
+  );
+}
+
+/**
+ * Advanced-mode time-cue settings for the current workspace (cue-v1): which period to mark, how often,
+ * which sounds, accents, and the checkpoint list. Preset mode ignores these and uses the fixed uniform cue.
+ */
+export function TimeCueControls() {
+  const tab = useStore((st) => st.tab);
+  const cfg = useStore((st) => st.timeCues[st.tab]);
+  const checkpoints = useStore((st) => st.checkpoints[st.tab]);
+  const speed = useStore((st) => (st.tab === 'numerical' ? st.speed : st.visual.speed));
+  const timeline = tab === 'numerical' ? 'monthly' : 'seasonal';
+  const units = UNITS[timeline];
+  const spacing = cueSpacingSeconds(timeline, cfg.unit, cfg.everyN, speed);
+  const unitName = (u: CueUnit) => (u === 'step' ? `${UNIT_LABEL[timeline].step} (every step)` : UNIT_LABEL[timeline][u]);
+  return (
+    <div style={{ fontSize: 13 }}>
+      <div className="field">
+        <label htmlFor="cue-unit">Mark every</label>
+        <div className="row">
+          <input type="number" min={1} max={100} value={cfg.everyN} disabled={cfg.unit === 'off'} aria-label="Every how many periods"
+            onChange={(e) => setTimeCues({ everyN: Math.max(1, Math.min(100, Math.round(Number(e.target.value) || 1))) })} style={{ width: 54 }} className="num-input" />
+          <select id="cue-unit" value={cfg.unit} onChange={(e) => setTimeCues({ unit: e.target.value as CueUnit | 'off' })} style={{ flex: 1 }}>
+            <option value="off">Off (no time cues)</option>
+            {units.map((u) => <option key={u} value={u}>{unitName(u)}</option>)}
+          </select>
+        </div>
+      </div>
+      {spacing != null && spacing < 0.25 && <p className="muted" style={{ fontSize: 11.5, margin: '-4px 0 6px' }}>At this speed the cues come every {spacing.toFixed(2)} s — choose a longer period or slow down.</p>}
+      <CueSoundRow id="cue-sound" label="Cue sound" value={cfg.sound} onChange={(v) => setTimeCues({ sound: v })} onPlay={(v) => auditionCue('period', v)} />
+      <label className="row" style={{ fontSize: 12.5, marginBottom: 8 }}>
+        <input type="checkbox" checked={cfg.accentLarger} onChange={(e) => setTimeCues({ accentLarger: e.target.checked })} /> Louder when a larger period starts (e.g. a year when marking quarters)
+      </label>
+      <label className="row" style={{ fontSize: 12.5, marginBottom: 6 }}>
+        <input type="checkbox" checked={cfg.checkpoints} onChange={(e) => setTimeCues({ checkpoints: e.target.checked })} /> Play checkpoint cues
+      </label>
+      <CueSoundRow id="cp-sound" label="Checkpoint sound" value={cfg.checkpointSound} onChange={(v) => setTimeCues({ checkpointSound: v })} onPlay={(v) => auditionCue('checkpoint', v)} disabled={!cfg.checkpoints} />
+      <div className="row" style={{ marginBottom: 4 }}>
+        <b style={{ fontSize: 12.5 }}>Checkpoints ({checkpoints.length})</b><span className="spacer" />
+        <button className="btn small" onClick={() => toggleCheckpoint()} aria-keyshortcuts="C">⚑ Add / remove at cursor</button>
+      </div>
+      {checkpoints.length === 0 ? <p className="muted" style={{ fontSize: 12, margin: '0 0 6px' }}>No checkpoints yet. Move to a step and press C.</p> : (
+        <ul className="cp-list">
+          {checkpoints.map((c) => (
+            <li key={c.key} className="row">
+              <button className="btn small ghost" onClick={() => jumpToCheckpoint(c.key)} title="Jump here" aria-label={`Jump to checkpoint ${c.label}`}><span className="mono">{c.key}</span></button>
+              <input type="text" value={c.label} onChange={(e) => renameCheckpoint(c.key, e.target.value)} aria-label={`Label for checkpoint ${c.key}`} style={{ flex: 1 }} />
+              <button className="btn small ghost" onClick={() => removeCheckpoint(c.key)} aria-label={`Remove checkpoint ${c.label}`}><I.X size={13} /></button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="muted" style={{ fontSize: 11.5, margin: '4px 0 6px' }}>Time cues mark the timeline, not the data: they sound the same in Musical and Geophony and never change with the measurements. Preset mode always uses one knock per {timeline === 'monthly' ? 'year' : 'month'} and a doubled knock for checkpoints.</p>
+    </div>
+  );
+}
+
+function CueSoundRow({ id, label, value, onChange, onPlay, disabled }: { id: string; label: string; value: CueSound; onChange: (v: CueSound) => void; onPlay: (v: CueSound) => void; disabled?: boolean }) {
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <div className="row">
+        <select id={id} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value as CueSound)} style={{ flex: 1 }}>
+          {CUE_SOUNDS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+        </select>
+        <button className="btn small" disabled={disabled} onClick={() => onPlay(value)} aria-label={`Preview ${label.toLowerCase()}`}><I.Play size={12} /></button>
+      </div>
+    </div>
   );
 }

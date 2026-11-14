@@ -4,7 +4,7 @@ import { controller } from '../../playback/controller';
 import { midiToName } from '../../sound/mapping';
 import { comparePhrase, explainStep, rankPhrase } from '../../sound/context';
 import { useStore, set } from '../../state/store';
-import { seek, setSpeed, stepBy, togglePlay, toggleLoop } from '../../state/actions';
+import { jumpToCheckpoint, removeCheckpoint, seek, setSpeed, stepBy, toggleCheckpoint, togglePlay, toggleLoop } from '../../state/actions';
 import * as I from '../icons';
 
 interface Props {
@@ -24,6 +24,8 @@ interface Props {
   score?: { label: string; node: React.ReactNode; available: boolean; events: SoundEvent[] };
   /** label used in the "Now hearing" caption (defaults to the axis label of the step) */
   captionLabel?: (i: number) => string;
+  /** checkpoint key of step i ("YYYY-MM" or "D###"), to show whether the cursor sits on a checkpoint */
+  checkpointKey?: (i: number) => string;
 }
 
 const WET = '#38bdf8', DRY = '#fb923c';
@@ -41,6 +43,8 @@ export function MusicChart(p: Props) {
   const reduced = useStore((s) => s.a11y.reducedMotion);
   const mode = useStore((s) => s.sound.mode);
   const preset = useStore((s) => s.uiMode === 'preset');
+  const workspace = useStore((s) => s.tab);
+  const checkpoints = useStore((s) => s.checkpoints[s.tab]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 220 });
@@ -180,6 +184,26 @@ export function MusicChart(p: Props) {
             hits.push({ x: sx(s), y: texY, w: stepW, h: laneTex, ev });
           } else if (ev.kind === 'marker') {
             if (ev.marker === 'region' || ev.marker === 'clipped') continue;
+            if (ev.marker === 'time') {
+              // time cue: a thin tick across the marker lane (taller when accented)
+              const hgt = ev.timeCue?.accent === 'strong' ? laneMark - 4 : ev.timeCue?.accent === 'medium' ? laneMark - 9 : laneMark - 14;
+              ctx.fillStyle = sel ? '#f5b942' : '#5eead4';
+              ctx.fillRect(sx(s), markY + laneMark - 2 - hgt, 2, hgt);
+              hits.push({ x: sx(s) - 2, y: markY, w: 6, h: laneMark, ev });
+              continue;
+            }
+            if (ev.marker === 'checkpoint') {
+              // checkpoint: a flag through the whole roll with its label
+              const fx = sx(s);
+              ctx.strokeStyle = sel ? '#f5b942' : '#fbbf24'; ctx.lineWidth = 1.5; ctx.setLineDash([2, 3]);
+              ctx.beginPath(); ctx.moveTo(fx, top); ctx.lineTo(fx, markY + laneMark); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
+              ctx.fillStyle = '#fbbf24';
+              ctx.beginPath(); ctx.moveTo(fx, markY + 3); ctx.lineTo(fx + 10, markY + 7); ctx.lineTo(fx, markY + 11); ctx.fill();
+              ctx.font = '10.5px Inter, sans-serif';
+              ctx.fillText((ev.timeCue?.label ?? '').slice(0, Math.max(4, Math.floor(stepW / 6))), fx + 12, markY + 12);
+              hits.push({ x: fx - 3, y: top, w: 14, h: markY + laneMark - top, ev });
+              continue;
+            }
             if (ev.marker === 'extreme') {
               ctx.fillStyle = sel ? '#f5b942' : '#fde68a';
               ctx.beginPath(); const cx = sx(s) + 10, cy = markY + laneMark / 2; ctx.moveTo(cx, cy - 6); ctx.lineTo(cx + 6, cy); ctx.lineTo(cx, cy + 6); ctx.lineTo(cx - 6, cy); ctx.fill();
@@ -256,10 +280,25 @@ export function MusicChart(p: Props) {
               {p.speeds.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </label>
+          <button className={`btn small ${checkpoints.some((c) => (p.checkpointKey?.(p.cursor) ?? '') === c.key) ? 'active' : ''}`} onClick={() => toggleCheckpoint()} disabled={!p.enabled}
+            aria-keyshortcuts="C" title="Add or remove a checkpoint at the current step (C). A checkpoint plays a doubled knock when playback reaches it.">
+            ⚑ Checkpoint
+          </button>
           {playback === 'buffering' && <span className="chip amber">Buffering…</span>}
           {p.rightInfo}
         </div>
       </div>
+      {checkpoints.length > 0 && p.enabled && (
+        <div className="checkpoint-bar" role="list" aria-label={`Checkpoints in the ${workspace === 'numerical' ? 'Numerical' : 'Visual feed'} timeline`}>
+          <span className="caption-tag" style={{ color: '#fbbf24' }}>Checkpoints</span>
+          {checkpoints.map((c) => (
+            <span className="cp-chip" role="listitem" key={c.key}>
+              <button className="cp-jump" onClick={() => jumpToCheckpoint(c.key)} title={`Jump to ${c.label}`}>⚑ {c.label}</button>
+              <button className="cp-x" onClick={() => removeCheckpoint(c.key)} aria-label={`Remove checkpoint ${c.label}`}><I.X size={11} /></button>
+            </span>
+          ))}
+        </div>
+      )}
       {caption && (
         <div className={`caption-strip ${preset ? 'big' : ''} ${isWet(capCat) ? 'wet' : isDry(capCat) ? 'dry' : ''}`} aria-live="off">
           <span className="caption-tag">Now hearing</span>
@@ -311,6 +350,7 @@ function EventDetails({ selected, current, label }: { selected: SoundEvent | nul
             {e.context?.normal != null && <><dt>Normal</dt><dd>{e.context.normal.toFixed(4)} mm/hr <span style={{ fontFamily: 'var(--font)' }}>({e.context.baseline})</span></dd></>}
             {e.context?.anomaly != null && <><dt>Compared</dt><dd style={{ fontFamily: 'var(--font)' }}>{e.context.anomaly >= 0 ? '+' : ''}{e.context.anomaly.toFixed(4)} mm/hr{e.context.z != null ? ` · z ${e.context.z.toFixed(2)}` : ''} · {comparePhrase(e.context)}{rankPhrase(e.context) ? ` · ${rankPhrase(e.context)}` : ''}</dd></>}
             {e.pan != null && e.kind === 'sample' && <><dt>Stereo pan</dt><dd>{e.pan}</dd></>}
+            {e.timeCue && <><dt>Time cue</dt><dd style={{ fontFamily: 'var(--font)' }}>{e.timeCue.unit === 'checkpoint' ? `checkpoint “${e.timeCue.label}”` : e.timeCue.label} · {e.timeCue.sound}{e.timeCue.accent !== 'normal' ? ` · ${e.timeCue.accent}` : ''}</dd></>}
             {e.texture && <><dt>Texture</dt><dd>{e.texture.dropsPerSecond} drops/s · intensity {e.texture.intensity}</dd></>}
             <dt>Selection</dt><dd>{e.selectionId}</dd>
             <dt>Sources</dt><dd style={{ wordBreak: 'break-all' }}>{e.sourceObservationIds.join(', ')}</dd>

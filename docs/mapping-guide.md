@@ -1,4 +1,4 @@
-# Mapping guide (version `rain-v2`, frame sweep `scan-v3`)
+# Mapping guide (version `rain-v2`, frame sweep `scan-v3`, time cues `cue-v1`)
 
 Sound is a **designed mapping** of satellite estimates. It is not a recording. The mapping is fixed across dates and regions, so the same sound always means the same thing.
 
@@ -14,7 +14,7 @@ The idea of `rain-v2`: every month is heard **against its normal**. Pitch answer
 | Unusual month (\|z\| ≥ 2) | A two-note **bell** | Bell | ◆ "unusual" in the Event-markers lane |
 | Change from the previous **valid** month (optional, off by default) | Note density: +1 note per 0.08 mm/hr, up to 4 per step | Extra agitation | |
 | Longitude of 5 sampled cells (Puerto Princesa, Manila, Iloilo, Cebu, Davao) | Stereo pan, west → left (spatial-phrase preset) | — | Purple dots on map |
-| Year boundary | Soft high tick | — | Marker lane |
+| Year boundary | Heard through the time-cue layer (below) | same | Marker lane "2001" |
 | **Zero** rainfall (measured) | Lowest note plus a bright "zero" tick | Quietest rain | Real 0 in table |
 | **Missing** | No note, a muted thud, red gap. The hum still plays the normal, labelled "from other years" | Rain fades to silence | "missing", never 0 |
 
@@ -109,3 +109,29 @@ Presets are bundles of the settings above. They never change data.
 | Visual feed | Follow the monsoon (default) | rain-band voice + Philippine amount vs the yearly average |
 | Visual feed | Rain amount only | no band voice |
 | Visual feed | Rain sounds | Geophony + band voice |
+
+## Time cues and checkpoints (`cue-v1`)
+
+Time cues mark the **timeline**, not the data. They are short percussive sounds at the start of a period, so a listener can tell how far playback has gone.
+
+- They sound the same in Musical and Geophony.
+- They never change with the measurements: a missing month still gets its cue.
+- They have their own mixer layer, "Time cues".
+
+| | Numerical (one step = one month) | Visual feed (one step = one day of the seasonal cycle) |
+| --- | --- | --- |
+| **Preset mode** (fixed) | A woodblock knock every **January** | A woodblock knock on the **1st of every month** |
+| Checkpoint (both modes) | The same knock, **louder and doubled** | same |
+| Advanced: "Mark every" | Off, N months, N quarters (Jan/Apr/Jul/Oct) or N years | Off, N days, N weeks (every 7th day), N months or N quarters |
+| Advanced: sounds | Woodblock knock, small bell, click, low drum or two-note chime, set separately for the period cue and the checkpoint cue | same |
+| Advanced: accent | "Louder when a larger period starts", e.g. a January is louder when marking quarters | same |
+
+- **Checkpoints** are steps the user marks: press **C**, or use the ⚑ Checkpoint button, at the current step. They work in both modes and in both workspaces.
+  - A checkpoint replaces the ordinary cue on its step.
+  - It shows as a flag in the piano roll, a dotted line in the graph and a chip above the caption. Click the chip to jump to it.
+  - The caption starts with "Checkpoint “label” ·", and an ordinary cue step starts with "New year ·", "New month ·" and so on.
+  - With *Speak summaries* on, narration reads the checkpoint label during playback.
+- Counting for "every N" starts at the beginning of the timeline, so cues don't move when the playback range changes.
+- Advanced mode warns when cues would come closer than 0.25 s at the current speed.
+- The old `year` tick was played only in Musical mode. It is no longer sounded by the rain mapping; the year marker stays in the event list, and its sound now comes from this layer, in both modes. The rain mapping's events are unchanged, so `MAPPING.version` stays `rain-v2`.
+- Checkpoints and Advanced cue settings are saved in project files (optional fields; older files still open).

@@ -15,7 +15,7 @@ import { FrameScore, useSweepProgress } from '../shared/FrameScore';
 import { set, useStore } from '../../state/store';
 import * as I from '../icons';
 import { MusicChart } from '../shared/MusicChart';
-import { Disclosure, InstrumentRow, LegendButton, MappingRows, MasterVolume, ModeTabs, PitchRange, ScaleRow, LayerLevels } from '../shared/SoundControls';
+import { Disclosure, InstrumentRow, LegendButton, MappingRows, MasterVolume, ModeTabs, PitchRange, ScaleRow, LayerLevels, TimeCueControls } from '../shared/SoundControls';
 import { TimeSeriesGraph } from '../shared/TimeSeriesGraph';
 
 const PH_BOX = { lonMin: 116, lonMax: 127.5, latMin: 4.5, latMax: 21.5 };
@@ -50,6 +50,7 @@ export function VisualWorkspace() {
           emptyHint={media.state !== 'ready' ? 'No media timeline loaded' : 'Connect matching climatology data in Sound Studio'}
           rightInfo={media.manifest && <span className="chip mono">Day {visual.day + 1}</span>}
           captionLabel={(i) => `${labels[i] ?? ''} (seasonal average, ${REGION_NAMES[visual.regionId]})`}
+          checkpointKey={(i) => `D${String(i + 1).padStart(3, '0')}`}
           footNote="Video frame index ≠ calendar day · each frame's date is read from the SVS date overlays (366 days, incl. Feb 29)"
           score={{
             label: 'Frame score', available: !!grid, events: scanEvents,
@@ -415,6 +416,7 @@ function SoundStudio() {
             </dl>
           ) : <p className="muted" style={{ fontSize: 12 }}>Import the media to inspect frame-to-date evidence.</p>}
         </Disclosure>
+        <Disclosure title="Time cues & checkpoints"><TimeCueControls /></Disclosure>
         <Disclosure title="Layer levels"><LayerLevels /></Disclosure>
         <div className="disclosure" style={{ opacity: 0.55, cursor: 'default' }}><I.Caret /> Hybrid · Later</div>
       </div>
@@ -516,6 +518,7 @@ function SeasonalGraph({ preset }: { preset: boolean }) {
   const visual = useStore((s) => s.visual);
   const media = useStore((s) => s.media);
   const tab = useStore((s) => s.graphTab);
+  const visualCheckpoints = useStore((s) => s.checkpoints.visual);
   const setTabState = (t: 'describe' | 'rain' | 'band' | 'dist') => set({ graphTab: t });
   const doc = useStore((s) => s.frameScan.doc);
   const obs = useMemo(() => seasonalObservations(), [link.climatology, visual.regionId, media.manifest]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -555,6 +558,7 @@ function SeasonalGraph({ preset }: { preset: boolean }) {
             <div style={{ flex: 1, minHeight: 0 }}>
               <TimeSeriesGraph points={obs.map((o, i) => ({ key: media.manifest!.frames[i].label, value: o.value }))} cursor={visual.day} onSelect={(i) => seek(i)}
                 reference={seasonalContexts(obs.map((o) => o.value)).map((c) => c.normal)} referenceLabel="yearly average"
+                marks={visualCheckpoints.map((c) => ({ index: Number(c.key.slice(1)) - 1, label: c.label }))}
                 yLabel="mm/hr" ticks={ticks} describe={`Reconstructed seasonal mean rainfall for ${REGION_NAMES[visual.regionId]}. Current day ${media.manifest!.frames[visual.day]?.label}: ${cur?.value?.toFixed(3)} mm/hr.`} />
             </div>
           </>

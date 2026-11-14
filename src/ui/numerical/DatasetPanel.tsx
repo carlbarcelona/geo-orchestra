@@ -17,6 +17,7 @@ export function DatasetPanel({ simple = false }: { simple?: boolean }) {
   const cursor = useStore((s) => s.cursor);
   const range = useStore((s) => s.range);
   const load = useStore((s) => s.load);
+  const checkpoints = useStore((s) => s.checkpoints.numerical);
   const obs = useMemo(() => currentObservations(), [ds, selection]); // eslint-disable-line react-hooks/exhaustive-deps
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'valid' | 'partial' | 'missing'>('all');
@@ -178,6 +179,7 @@ export function DatasetPanel({ simple = false }: { simple?: boolean }) {
             <TimeSeriesGraph
               points={obs.map((o) => ({ key: o.t, value: yVar === 'precipitation' ? o.value : yVar === 'randomError' ? o.randomError ?? null : o.coverage ?? null }))}
               cursor={cursor} range={range} onSelect={seek} kind={simple ? 'line' : kind}
+              marks={checkpoints.map((c) => ({ index: ds.months.indexOf(c.key), label: c.label })).filter((mk) => mk.index >= 0)}
               reference={yVar === 'precipitation' && hasNormal && (simple || showNormal) ? normals : undefined} referenceLabel={`normal (${NORMAL.baseline[0]}–${NORMAL.baseline[1]})`}
               yLabel={yVar === 'coverage' ? 'Valid coverage' : yVar === 'randomError' ? 'Random error (mm/hr)' : 'Precipitation rate (mm/hr)'}
               ticks={ticks} yMax={yVar === 'coverage' ? 1 : undefined}

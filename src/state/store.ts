@@ -3,6 +3,7 @@ import type { AlignmentEvidence, ClimatologyLinkage, FrameScanDoc, Selection, So
 import type { Dataset } from '../data/dataset';
 import type { InstrumentId, LayerLevels, SoundMode } from '../sound/engine';
 import { DEFAULT_PRESET, type ListeningPresetId } from '../sound/presets';
+import { PRESET_TIME_CUES, type Checkpoint, type TimeCueSettings } from '../sound/timeCues';
 
 export type Tab = 'numerical' | 'visual';
 export type UiMode = 'preset' | 'advanced';
@@ -38,6 +39,10 @@ export interface AppState {
   uiMode: UiMode;
   /** The listening preset chosen in Preset mode, per workspace. */
   listening: Record<Tab, ListeningPresetId>;
+  /** User checkpoints per workspace timeline (keys "YYYY-MM" or "D###"). */
+  checkpoints: Record<Tab, Checkpoint[]>;
+  /** Advanced-mode time-cue settings per workspace. Preset mode always uses PRESET_TIME_CUES. */
+  timeCues: Record<Tab, TimeCueSettings>;
   view: DataView;
   dataset: Dataset | null;
   load: { state: LoadState; progress: number; message: string; errors: string[]; warnings: string[]; source?: 'nasa' | 'synthetic' | 'file' };
@@ -74,8 +79,8 @@ export interface AppState {
 
 export const DEFAULT_SOUND: SoundSettings = {
   mode: 'musical', instrument: 'soft-piano', scale: 'C pentatonic', pitchLow: 48, pitchHigh: 84, master: 0.8,
-  layers: { melody: 0.8, texture: 0.75, markers: 0.5, image: 0.7, context: 0.55 },
-  muted: { melody: false, texture: false, markers: false, image: false, context: false }, spatialPhrases: false, preset: 'rain-pitch',
+  layers: { melody: 0.8, texture: 0.75, markers: 0.5, image: 0.7, context: 0.55, time: 0.6 },
+  muted: { melody: false, texture: false, markers: false, image: false, context: false, time: false }, spatialPhrases: false, preset: 'rain-pitch',
   reference: true, harmony: true, cues: true, variation: false,
 };
 
@@ -92,6 +97,8 @@ export const useStore = create<AppState>(() => ({
   tab: 'numerical',
   uiMode: readUiMode(),
   listening: { ...DEFAULT_PRESET },
+  checkpoints: { numerical: [], visual: [] },
+  timeCues: { numerical: { ...PRESET_TIME_CUES.monthly }, visual: { ...PRESET_TIME_CUES.seasonal } },
   view: readUiMode() === 'preset' ? 'graph' : 'table',
   dataset: null,
   load: { state: 'empty', progress: 0, message: '', errors: [], warnings: [] },

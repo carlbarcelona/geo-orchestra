@@ -17,10 +17,12 @@ interface Props {
   /** optional reference series (e.g. the normal for each month), drawn dashed with the gap shaded */
   reference?: (number | null)[];
   referenceLabel?: string;
+  /** checkpoints: dotted vertical lines with a short label */
+  marks?: { index: number; label: string }[];
 }
 
 /** SVG time series. Missing values break the line and are marked; they are never drawn as zero. */
-export function TimeSeriesGraph({ points, cursor, range, onSelect, yLabel, kind = 'line', ticks, describe, color = '#2dd4bf', yMax, formatValue = (v) => v.toFixed(3), reference, referenceLabel = 'normal' }: Props) {
+export function TimeSeriesGraph({ points, cursor, range, onSelect, yLabel, kind = 'line', ticks, describe, color = '#2dd4bf', yMax, formatValue = (v) => v.toFixed(3), reference, referenceLabel = 'normal', marks }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 600, h: 260 });
   const [hover, setHover] = useState<number | null>(null);
@@ -99,6 +101,12 @@ export function TimeSeriesGraph({ points, cursor, range, onSelect, yLabel, kind 
           : segments.map((d, k) => <path key={k} d={d} fill="none" stroke={color} strokeWidth={n > 150 ? 1.3 : 2} />)}
         {kind === 'line' && n <= 40 && points.map((p, i) => p.value == null ? null : <circle key={i} cx={x(i)} cy={y(p.value)} r={3} fill={color} />)}
         {points.map((p, i) => p.value == null ? <g key={`m${i}`}><line x1={x(i)} x2={x(i)} y1={m.t} y2={H - m.b} stroke="#f87171" strokeDasharray="3 3" opacity={0.6} /><text x={x(i)} y={m.t + 10} fill="#f87171" fontSize={10} textAnchor="middle">missing</text></g> : null)}
+        {marks?.map((mk) => (
+          <g key={`cp${mk.index}`} aria-hidden="true">
+            <line x1={x(mk.index)} x2={x(mk.index)} y1={m.t} y2={H - m.b} stroke="#fbbf24" strokeDasharray="2 3" strokeWidth={1.2} />
+            <text x={x(mk.index) + 3} y={m.t + 22} fill="#fde68a" fontSize={10}>⚑ {mk.label.slice(0, 14)}</text>
+          </g>
+        ))}
         {cp && (
           <g>
             <line x1={x(cursor)} x2={x(cursor)} y1={m.t} y2={H - m.b} stroke="#f5b942" strokeWidth={1.5} />

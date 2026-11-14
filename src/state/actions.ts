@@ -4,6 +4,7 @@ import { speak, spokenForm, stopSpeaking } from '../a11y/speech';
 import { explainStep, monthlyContexts, seasonalContexts } from '../sound/context';
 import { cellEvent, cropGrid, featureEvents, frameGrid, frameGridGlobal, imergGrid, SCAN, scanEvents, type ScanGrid } from '../sound/frameScan';
 import { DEFAULT_PRESET, getPreset, type ListeningPresetId } from '../sound/presets';
+import { PRESET_TIME_CUES, timeCueEvents, type Checkpoint, type CueSound, type TimeCueSettings } from '../sound/timeCues';
 import { ProjectFileSchema, type ProjectFile } from '../contracts';
 import { areaSelection, cellSelection, monthLabel, observationsFor, type Dataset } from '../data/dataset';
 import { buildSyntheticDemo, loadNasaSample, parseProcessedFile } from '../data/loaders';
@@ -43,7 +44,9 @@ function speakNotable(i: number) {
   const step = s.tab === 'numerical' ? numericalEvents()[i] : seasonalEvents()[i];
   if (!step) return;
   const label = s.tab === 'numerical' ? monthLabel(s.dataset!.months[i], true) : `${s.media.manifest?.frames[i]?.label ?? ''}`;
-  if (step.some((e) => e.marker === 'extreme')) speak(spokenForm(explainStep(step, s.sound.mode, label)));
+  const cp = step.find((e) => e.marker === 'checkpoint');
+  if (cp) speak(`Checkpoint: ${cp.timeCue?.label ?? label}`);
+  else if (step.some((e) => e.marker === 'extreme')) speak(spokenForm(explainStep(step, s.sound.mode, label)));
   else if (step.some((e) => e.marker === 'turn')) speak(step.find((e) => e.marker === 'turn')!.explanation);
 }
 
@@ -77,7 +80,9 @@ function bucket(events: SoundEvent[], n: number): SoundEvent[][] {
 export function numericalEvents(): SoundEvent[][] {
   const { dataset, selection, sound } = get();
   if (!dataset || !selection) return [];
-  const key = `${dataset.id}|${selection.id}|${sound.scale}|${sound.pitchLow}|${sound.pitchHigh}|${sound.spatialPhrases}|${sound.reference}|${sound.harmony}|${sound.cues}|${sound.variation}`;
+  const cueSettings = effectiveTimeCues('numerical');
+  const cps = get().checkpoints.numerical;
+  const key = `${dataset.id}|${selection.id}|${sound.scale}|${sound.pitchLow}|${sound.pitchHigh}|${sound.spatialPhrases}|${sound.reference}|${sound.harmony}|${sound.cues}|${sound.variation}|${JSON.stringify(cueSettings)}|${JSON.stringify(cps)}`;
   const cache = get().eventsCache;
   if (cache?.key === key) return cache.events;
   const obs = observationsFor(dataset, selection);
@@ -87,6 +92,8 @@ export function numericalEvents(): SoundEvent[][] {
     reference: sound.reference, harmony: sound.harmony, cues: sound.cues, variation: sound.variation,
   }, sampleSeries(dataset), monthlyContexts(obs));
   const events = bucket(ev, obs.length);
+  const cues = timeCueEvents(dataset.months, dataset.months.map((t) => monthLabel(t)), 'monthly', cueSettings, cps);
+  events.forEach((step, i) => step.push(...(cues[i] ?? [])));
   set({ eventsCache: { key, events } });
   return events;
 }
@@ -242,9 +249,9 @@ export function announceCurrent() {
 }
 
 // ------------------------------------------------------------------ sound settings
-export const ELEMENT_LABELS: Record<keyof LayerLevels, string> = { melody: 'Melody', texture: 'Rain texture', markers: 'Markers', image: 'Frame sweep & band', context: 'Normal & cues' };
+export const ELEMENT_LABELS: Record<keyof LayerLevels, string> = { melody: 'Melody', texture: 'Rain texture', markers: 'Markers', image: 'Frame sweep & band', context: 'Normal & cues', time: 'Time cues' };
 /** Which mixer elements actually sound in each mode (markers and image layers are shared). */
-export const MODE_ELEMENTS: Record<SoundMode, (keyof LayerLevels)[]> = { musical: ['melody', 'context', 'markers', 'image'], geophony: ['texture', 'context', 'markers', 'image'] };
+export const MODE_ELEMENTS: Record<SoundMode, (keyof LayerLevels)[]> = { musical: ['melody', 'context', 'time', 'markers', 'image'], geophony: ['texture', 'context', 'time', 'markers', 'image'] };
 /** Levels the engine should apply: muted elements go to zero without losing their slider value. */
 export function mixLevels(s: SoundSettings): LayerLevels {
   const m = s.muted ?? DEFAULT_SOUND.muted;
@@ -302,7 +309,77 @@ export function setUiMode(mode: UiMode) {
     if (s.graphTab === 'dist') patch.graphTab = 'describe';
   }
   set(patch);
+  refreshEvents();
   announce(mode === 'preset' ? 'Preset mode: the essential controls and recommended listening settings.' : 'Advanced mode: every control is shown.');
+}
+
+// ------------------------------------------------------------------ time cues & checkpoints (cue-v1)
+/** Preset mode always uses the fixed, uniform cue; Advanced uses the workspace's own settings. */
+export function effectiveTimeCues(tab: Tab): TimeCueSettings {
+  const s = get();
+  return s.uiMode === 'preset' ? PRESET_TIME_CUES[tab === 'numerical' ? 'monthly' : 'seasonal'] : s.timeCues[tab];
+}
+
+/** Regenerate the current timeline's events (cue or checkpoint change) without stopping playback. */
+function refreshEvents() {
+  set({ eventsCache: null });
+  if (controller.adapterId === 'monthly') controller.updateEvents(numericalEvents());
+  else if (controller.adapterId === 'seasonal') controller.updateEvents(seasonalEvents());
+}
+
+/** Key and label of the current step in the current workspace. */
+function currentStepKey(): { key: string; label: string; index: number } | null {
+  const s = get();
+  if (s.tab === 'numerical') {
+    const t = s.dataset?.months[s.cursor];
+    return t ? { key: t, label: monthLabel(t), index: s.cursor } : null;
+  }
+  const f = s.media.manifest?.frames[s.visual.day];
+  return f ? { key: `D${String(f.day).padStart(3, '0')}`, label: f.label, index: s.visual.day } : null;
+}
+
+/** Add a checkpoint at the current step, or remove it if one is already there (keyboard: C). */
+export function toggleCheckpoint(label?: string) {
+  const s = get();
+  const at = currentStepKey();
+  if (!at) { announce('Load data or the visual feed before adding a checkpoint.'); return; }
+  const list = s.checkpoints[s.tab];
+  if (list.some((c) => c.key === at.key)) { removeCheckpoint(at.key); return; }
+  const next: Checkpoint[] = [...list, { key: at.key, label: label?.trim() || at.label }].sort((a, b) => a.key.localeCompare(b.key));
+  set({ checkpoints: { ...s.checkpoints, [s.tab]: next } });
+  refreshEvents();
+  announce(`Checkpoint added at ${at.label}. You will hear a double knock when playback reaches it.`);
+}
+export function removeCheckpoint(key: string, tab: Tab = get().tab) {
+  const s = get();
+  const cp = s.checkpoints[tab].find((c) => c.key === key);
+  set({ checkpoints: { ...s.checkpoints, [tab]: s.checkpoints[tab].filter((c) => c.key !== key) } });
+  refreshEvents();
+  if (cp) announce(`Checkpoint ${cp.label} removed`);
+}
+export function renameCheckpoint(key: string, label: string, tab: Tab = get().tab) {
+  const s = get();
+  set({ checkpoints: { ...s.checkpoints, [tab]: s.checkpoints[tab].map((c) => (c.key === key ? { ...c, label } : c)) } });
+  refreshEvents();
+}
+export function jumpToCheckpoint(key: string) {
+  const s = get();
+  const i = s.tab === 'numerical' ? (s.dataset?.months.indexOf(key) ?? -1) : Number(key.slice(1)) - 1;
+  if (i < 0) return;
+  if (s.tab === 'visual' && s.link.state !== 'reconstructed') setVisual({ day: i });
+  else seek(i);
+}
+export function setTimeCues(patch: Partial<TimeCueSettings>, tab: Tab = get().tab) {
+  const s = get();
+  set({ timeCues: { ...s.timeCues, [tab]: { ...s.timeCues[tab], ...patch } } });
+  refreshEvents();
+}
+/** Preview a cue: the period cue, the checkpoint cue, or a specific sound. */
+export function auditionCue(kind: 'period' | 'checkpoint', sound?: CueSound) {
+  const eff = effectiveTimeCues(get().tab);
+  void engine.auditionCue(kind === 'checkpoint'
+    ? { unit: 'checkpoint', sound: sound ?? eff.checkpointSound, accent: 'strong', label: 'checkpoint' }
+    : { unit: 'year', sound: sound ?? eff.sound, accent: 'normal', label: 'time cue' });
 }
 
 /** Apply a listening preset: sound settings only — the dataset, selection and range never change. */
@@ -439,6 +516,8 @@ function seasonalEvents(): SoundEvent[][] {
     reference: sound.reference, harmony: sound.harmony, cues: sound.cues, variation: sound.variation,
   }, [], seasonalContexts(obs.map((o) => o.value)));
   const steps = bucket(ev, obs.length);
+  const cues = timeCueEvents(obs.map((o) => o.t), labels, 'seasonal', effectiveTimeCues('visual'), get().checkpoints.visual);
+  steps.forEach((step, i) => step.push(...(cues[i] ?? [])));
   const { image, frameScan } = get();
   if (image.enabled && frameScan.doc && frameScan.bytes) {
     const feats = image.featureVoice ? featureEvents(frameScan.doc.days, { scale: sound.scale, pitchLow: sound.pitchLow, pitchHigh: sound.pitchHigh }) : [];
@@ -608,6 +687,8 @@ export function saveProject() {
     visual: { imported: s.media.state === 'ready', linked: s.link.state === 'reconstructed', regionId: s.visual.regionId, day: s.visual.day, mode: s.visual.mode, roi: s.visual.roi, speed: s.visual.speed },
     a11y: s.a11y,
     uiMode: s.uiMode,
+    checkpoints: s.checkpoints,
+    timeCues: s.timeCues,
   };
   const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -628,6 +709,8 @@ export async function openProject(file: File): Promise<string[]> {
   } catch (e) { return [`Could not read ${file.name}: ${(e as Error).message}`]; }
   controller.pause('project opened');
   if (doc.uiMode) setUiMode(doc.uiMode);
+  if (doc.checkpoints) set({ checkpoints: doc.checkpoints });
+  if (doc.timeCues) set({ timeCues: doc.timeCues as ReturnType<typeof get>['timeCues'] });
   set({ sound: { ...DEFAULT_SOUND, ...doc.sound, layers: { ...DEFAULT_SOUND.layers, ...(doc.sound?.layers ?? {}) }, muted: { ...DEFAULT_SOUND.muted, ...(doc.sound?.muted ?? {}) } }, speed: doc.speed, loop: doc.loop, view: doc.view, a11y: { ...get().a11y, ...doc.a11y } });
   engine.setInstrument(get().sound.instrument); engine.setMaster(get().sound.master); engine.setLevels(mixLevels(get().sound));
   controller.setLoop(doc.loop);

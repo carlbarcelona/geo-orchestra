@@ -5,7 +5,7 @@ import { comparePhrase, NORMAL, rankPhrase } from '../../sound/context';
 import { SCAN } from '../../sound/frameScan';
 import { getPreset, LISTENING_PRESETS, matchesPreset } from '../../sound/presets';
 import { monthLabel } from '../../data/dataset';
-import { applyListeningPreset, currentObservations, numericalEvents, quickStart, selectRegion } from '../../state/actions';
+import { applyListeningPreset, auditionCue, currentObservations, numericalEvents, quickStart, selectRegion } from '../../state/actions';
 import { set, useStore } from '../../state/store';
 import * as I from '../icons';
 import { BrailleChart } from '../shared/BrailleChart';
@@ -89,6 +89,16 @@ export function ListeningGuide({ workspace }: { workspace: 'numerical' | 'visual
       <div className="section-head" style={{ fontSize: 12 }}><I.Note size={14} /> What you hear</div>
       <dl className="section-body guide-list">
         {(items.filter(Boolean) as string[][]).map(([k, v]) => <div key={k} className="guide-row"><dt>{k}</dt><dd>{v}</dd></div>)}
+        <div className="guide-row">
+          <dt>Knock</dt>
+          <dd>
+            a new {workspace === 'numerical' ? 'year' : 'month'} begins; a <b>double knock</b> is your checkpoint (press C to set one)
+            <span className="row" style={{ marginTop: 3 }}>
+              <button className="btn small" onClick={() => auditionCue('period')} aria-label="Preview the time cue"><I.Play size={11} /> knock</button>
+              <button className="btn small" onClick={() => auditionCue('checkpoint')} aria-label="Preview the checkpoint cue"><I.Play size={11} /> double knock</button>
+            </span>
+          </dd>
+        </div>
       </dl>
     </div>
   );

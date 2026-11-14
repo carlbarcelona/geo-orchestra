@@ -45,3 +45,4 @@ The teammate's `sound/understanding-presets` landed first. It added a fifth mixe
 - Opening a project merges saved `layers` and `muted` with the defaults.
 - Preset mode's sound panels (`PresetSoundPanel`, the visual Preset studio) got the mode colour and the mode tag. No new controls were added to Preset.
 - Checked in Claude in Chrome (localhost): Geophony hides the instrument and lists four elements; muting Rain texture announces "Rain texture muted"; Musical brings Melody and the instrument back.
+- A third merge brought in the teammate's time cues (`cue-v1`). It adds a sixth layer, `time`, which is muteable in both modes as "Time cues". The legend's mute section became section 5. 105 tests pass.

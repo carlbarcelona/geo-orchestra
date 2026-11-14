@@ -33,7 +33,7 @@
   4. Apply a trailing 30-day mean.
 - This is not the SVS daily product, and the app never labels it as exact.
 
-## Automated checks (`npm test`, 22 passing)
+## Automated checks (`npm test`, 74 passing on 15 Nov 2026)
 - Missing vs zero
 - No change computed across gaps
 - cos-latitude aggregation, coverage threshold and mask
@@ -41,6 +41,15 @@
 - Geophony monotonicity and longitude pan
 - SVS alignment: 366 days, Feb 29, coverage of all 1000 frames, fixed-rate drift
 - Import validation, with absent months shown as missing
+- `rain-v2` (tests/context.test.ts):
+  - normals use only valid 2001–2022 values; fewer than 5 years gives no normal
+  - category thresholds, ranks, missing months keep the hum but get no category
+  - the hum is the pitch mapping of the normal; the melody sits above it when wetter and below when drier
+  - wetter → major chord, drier → minor, |z| ≥ 2 → bell, much wetter → thunder; layers can be switched off
+  - captions for compared, missing, zero, no-normal and seasonal steps
+  - on the shipped Philippine record: every month has a category, the split is 12 / 93 / 100 / 65 / 25, 14 unusual months, at least 10 distinct melody notes
+- `scan-v2` (tests/framescan.test.ts): the 16-band latitude table, rain classes, 11 beats with at most 2 notes each, dry beats are rests, Philippine-sector ticks, and the same note for the same latitude in the sweep, the band voice and the cursor
+- Preset / Advanced (tests/presets.test.ts): first visit is Preset; switching mode and applying listening presets never change data, selection or range; edits make a preset "custom"; project files with and without `uiMode` parse; legend examples land in their stated categories
 - Controller behavior:
   - seek cancels stale ticks and draws
   - no doubled schedules after repeated play/pause
@@ -84,3 +93,12 @@ The console showed no application errors.
   - braille charts render
   - timelapse with a sweep on every frame, at 1 day/s
   - no console errors
+
+## rain-v2, scan-v2 and Preset mode (15 Nov 2026, Claude in Chrome, localhost)
+
+- Fresh load shows Preset. **Start listening** loaded 295 months, selected the Philippines and played from Jun 2000. The caption read, for example, "Dec 2000 · 0.392 mm/hr · wetter than a normal December (+0.6 SD) · you hear melody above the hum, bright (major) chord".
+- The graph shows the dashed 2001–2022 normal with wetter and drier shading; the piano roll shows the hum line and ▲/▼ marks.
+- Switching to Advanced during playback restored every control and did not stop playback; switching back hid them.
+- Visual feed in Preset: one button imported the frames, connected the reconstructed climatology and played. **S** drew the Frame score with 11 numbered beats, notes on the note/latitude axis and the Philippine beats shaded.
+- No console errors.
+- **Not verified:** how it sounds on speakers (hum level, chord balance, thunder and wind cues), narration voices, and the 1180 px / 720 px layouts. These need a listening session on the demo laptop.

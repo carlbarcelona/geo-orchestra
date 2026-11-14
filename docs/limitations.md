@@ -10,6 +10,8 @@
 | 100 ms visual/audio sync target | Implemented and instrumented. **Not verified on a foreground display** (see verification.md). |
 | Hybrid mode, staff notation, MIDI/WAV export, CSV import, region drawing | Not in this release |
 | Image-feature sonification | Delivered as **image-derived** values decoded from NASA's colorbar (r = 0.97 against the reconstruction). Always labelled approximate and kept separate from measurements. |
+| Sound against the normal (`rain-v2`) and the beat-based frame sweep (`scan-v2`) | Delivered and unit-tested. **Not yet judged by listeners** (balance of hum, chords and cues). |
+| Preset / Advanced mode | Delivered. Preset is the first-run default. |
 | Braille charts on refreshable displays | Implemented with Unicode braille. **Not verified on hardware.** |
 
 Other notes:
@@ -18,3 +20,6 @@ Other notes:
 - The SVS colorbar is in mm/day. The app's own maps use mm/hr on a fixed 0–1.5 range.
 - Saved projects store settings only. An imported file must be imported again after opening a project.
 - The legacy `gpm1.gesdisc` server is retired. `pipeline/fetch_imerg_subset.py` targets Earthdata Cloud OPeNDAP.
+- "Normal" needs at least 5 valid years of a calendar month within 2001–2022. The synthetic demo and short imports have no normal, so they play the amount only (the caption says so).
+- Wetter/drier categories and the "unusual" bell are listening aids computed from the measurements. They are not new measurements and are not attributed to any cause (for example ENSO).
+- Narration depends on the browser's speech engine and voices.

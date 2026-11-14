@@ -9,6 +9,7 @@ import { SoundPanel } from './ui/numerical/SoundPanel';
 import { MusicChart } from './ui/shared/MusicChart';
 import { Dialogs, Header, LiveRegion, StatusBar, SubBar, useShortcuts } from './ui/shell/Shell';
 import { VisualWorkspace } from './ui/visual/VisualWorkspace';
+import { PresetSoundPanel, StartPanel } from './ui/preset/PresetPanels';
 
 const MONTH_SPEEDS = [
   { value: 0.5, label: '0.5 month/s' }, { value: 1, label: '1 month/s' }, { value: 2, label: '2 months/s' },
@@ -27,16 +28,17 @@ function NumericalWorkspace() {
   const sound = useStore((s) => s.sound);
   const grid = useMemo(() => (ds?.grid ? currentScanGrid() : null), [ds, cursor]); // eslint-disable-line react-hooks/exhaustive-deps
   const scanEv = useMemo(() => (grid ? currentScanEvents() : []), [grid, sound.scale, sound.pitchLow, sound.pitchHigh]); // eslint-disable-line react-hooks/exhaustive-deps
+  const preset = useStore((s) => s.uiMode === 'preset');
   return (
-    <main id="main" className="workspace numerical" aria-label="Numerical workspace">
-      <ProjectPanel />
-      <DatasetPanel />
-      <SoundPanel />
+    <main id="main" className={`workspace numerical ${preset ? 'preset' : ''}`} aria-label="Numerical workspace">
+      {preset ? <StartPanel /> : <ProjectPanel />}
+      <DatasetPanel simple={preset} />
+      {preset ? <PresetSoundPanel /> : <SoundPanel />}
       <MusicChart
         events={events} stepLabels={labels} axisTitle="Observation month (UTC)" cursor={cursor} range={range}
         speeds={MONTH_SPEEDS} speed={speed} visibleSteps={12} enabled={!!ds && !!selection && events.length > 0}
-        emptyTitle="Load observations to generate notes"
-        score={{
+        emptyTitle={preset ? 'Press “Start listening” to hear the rainfall' : 'Load observations to generate notes'}
+        score={preset ? undefined : {
           label: 'Map score', available: !!grid, events: scanEv,
           node: <FrameScore grid={grid} events={scanEv} tab="numerical" title={`Map score · ${ds ? monthLabel(ds.months[cursor]) : ''} · measured IMERG (0.5° cells)`} emptyText="Load the NASA sample to turn each month's map into a score" />,
         }}

@@ -1,13 +1,16 @@
-import type { AlignmentEvidence, ClimatologyLinkage, FrameScanDoc, Observation, Selection, SoundEvent, VisualMediaManifest } from '../contracts';
+import type { AlignmentEvidence, ClimatologyLinkage, FrameScanDoc, Observation, Selection, SoundEvent, StepContext, VisualMediaManifest } from '../contracts';
 import { describeCell, describeFrame } from '../a11y/braille';
-import { featureEvents, frameGrid, imergGrid, scanEvents, type ScanGrid } from '../sound/frameScan';
+import { speak, spokenForm, stopSpeaking } from '../a11y/speech';
+import { explainStep, monthlyContexts, seasonalContexts } from '../sound/context';
+import { cellEvent, featureEvents, frameGrid, imergGrid, scanEvents, type ScanGrid } from '../sound/frameScan';
+import { DEFAULT_PRESET, getPreset, type ListeningPresetId } from '../sound/presets';
 import { ProjectFileSchema, type ProjectFile } from '../contracts';
 import { areaSelection, cellSelection, monthLabel, observationsFor, type Dataset } from '../data/dataset';
 import { buildSyntheticDemo, loadNasaSample, parseProcessedFile } from '../data/loaders';
 import { controller, type TimelineAdapter } from '../playback/controller';
 import { engine, type InstrumentId, type SoundMode } from '../sound/engine';
 import { generateEvents, type SampleSeries } from '../sound/mapping';
-import { announce, DEFAULT_SOUND, get, set, type DataView, type SoundSettings, type Tab } from './store';
+import { announce, DEFAULT_SOUND, get, set, writeUiMode, type DataView, type SoundSettings, type Tab, type UiMode } from './store';
 
 // ------------------------------------------------------------------ controller -> store
 controller.subscribe(() => {
@@ -28,7 +31,21 @@ controller.subscribe(() => {
   }
   set(patch);
   if (s.a11y.announceSteps && controller.state === 'stopped') announceCurrent();
+  if (s.a11y.speak && controller.state === 'playing') speakNotable(controller.index);
 });
+
+let lastSpoken = -1;
+/** During playback only notable steps are spoken (unusual months, rain-band turns) so speech never lags the music. */
+function speakNotable(i: number) {
+  if (i === lastSpoken) return;
+  lastSpoken = i;
+  const s = get();
+  const step = s.tab === 'numerical' ? numericalEvents()[i] : seasonalEvents()[i];
+  if (!step) return;
+  const label = s.tab === 'numerical' ? monthLabel(s.dataset!.months[i], true) : `${s.media.manifest?.frames[i]?.label ?? ''}`;
+  if (step.some((e) => e.marker === 'extreme')) speak(spokenForm(explainStep(step, s.sound.mode, label)));
+  else if (step.some((e) => e.marker === 'turn')) speak(step.find((e) => e.marker === 'turn')!.explanation);
+}
 
 let lastState = controller.state;
 controller.subscribe(() => {
@@ -60,14 +77,15 @@ function bucket(events: SoundEvent[], n: number): SoundEvent[][] {
 export function numericalEvents(): SoundEvent[][] {
   const { dataset, selection, sound } = get();
   if (!dataset || !selection) return [];
-  const key = `${dataset.id}|${selection.id}|${sound.scale}|${sound.pitchLow}|${sound.pitchHigh}|${sound.spatialPhrases}`;
+  const key = `${dataset.id}|${selection.id}|${sound.scale}|${sound.pitchLow}|${sound.pitchHigh}|${sound.spatialPhrases}|${sound.reference}|${sound.harmony}|${sound.cues}|${sound.variation}`;
   const cache = get().eventsCache;
   if (cache?.key === key) return cache.events;
   const obs = observationsFor(dataset, selection);
   const ev = generateEvents(obs, {
     scale: sound.scale, pitchLow: sound.pitchLow, pitchHigh: sound.pitchHigh, spatialPhrases: sound.spatialPhrases,
     datasetId: dataset.id, selectionId: selection.id, stepLabel: (t) => monthLabel(t),
-  }, sampleSeries(dataset));
+    reference: sound.reference, harmony: sound.harmony, cues: sound.cues, variation: sound.variation,
+  }, sampleSeries(dataset), monthlyContexts(obs));
   const events = bucket(ev, obs.length);
   set({ eventsCache: { key, events } });
   return events;
@@ -95,7 +113,7 @@ async function finishLoad(ds: Dataset, source: 'nasa' | 'synthetic' | 'file', wa
   const sel = ds.regions.length ? areaSelection(ds.regions.find((r) => r.id === 'philippines') ?? ds.regions[0])
     : ds.points?.length ? { id: `point:${ds.points[0].id}`, type: 'cell' as const, label: ds.points[0].label, aggregation: 'imported point (as supplied)', lat: ds.points[0].lat, lon: ds.points[0].lon } : null;
   const n = ds.months.length;
-  const start = Math.max(0, n - 12);
+  const start = 0; // play the whole record from its first month (was the last 12 months)
   set({
     dataset: ds, selection: sel, pins: sel ? [sel] : [], cursor: start, range: [0, n - 1], eventsCache: null, selectedEventId: null,
     load: { state: 'ready', progress: 1, message: `${n} monthly observations loaded`, errors: [], warnings, source },
@@ -190,18 +208,37 @@ export function setSpeed(v: number) {
 export function toggleLoop() { const loop = !get().loop; set({ loop }); controller.setLoop(loop); announce(loop ? 'Loop on' : 'Loop off'); }
 export function setRange(r: [number, number]) { set({ range: r }); controller.setRange(r); }
 
-export function announceCurrent() {
+/** The plain-language caption for the current step (what was measured, how it compares, what you hear). */
+export function currentCaption(): string {
   const s = get();
   if (s.tab === 'numerical') {
+    if (!s.dataset || !s.selection) return '';
+    const step = numericalEvents()[s.cursor];
+    const t = s.dataset.months[s.cursor];
+    return step && t ? explainStep(step, s.sound.mode, monthLabel(t, true)) : '';
+  }
+  if (s.link.state !== 'reconstructed') return '';
+  const f = s.media.manifest?.frames[s.visual.day];
+  const step = seasonalEvents()[s.visual.day];
+  return step && f ? explainStep(step, s.sound.mode, `${f.label} (seasonal average)`) : '';
+}
+
+export function announceCurrent() {
+  const s = get();
+  let text = '';
+  if (s.tab === 'numerical') {
     const obs = currentObservations()[s.cursor];
-    if (obs) announce(`${monthLabel(obs.t, true)}: ${obs.value == null ? 'missing measurement' : obs.value.toFixed(3) + ' millimetres per hour'}, ${obs.quality}.`);
+    if (obs) text = `${currentCaption()} Availability: ${obs.quality}.`;
   } else {
     const v = seasonalObservations()[s.visual.day];
     const f = s.media.manifest?.frames[s.visual.day];
     const ft = s.frameScan.doc?.days[s.visual.day];
-    if (ft && s.image.enabled) announce(describeFrame(ft, s.frameScan.doc!.days, v?.value ?? null));
-    else if (v && f) announce(`${f.label}, seasonal average: ${v.value?.toFixed(3)} millimetres per hour`);
+    if (ft && s.image.enabled) text = describeFrame(ft, s.frameScan.doc!.days, v?.value ?? null);
+    else if (v && f) text = currentCaption();
   }
+  if (!text) return;
+  announce(text);
+  if (s.a11y.speak) speak(spokenForm(text));
 }
 
 // ------------------------------------------------------------------ sound settings
@@ -213,7 +250,8 @@ export function updateSound(patch: Partial<SoundSettings>) {
   if (patch.master != null) engine.setMaster(sound.master);
   if (patch.layers) engine.setLevels(sound.layers);
   if (patch.mode) { controller.setMode(patch.mode as SoundMode); announce(`${patch.mode === 'musical' ? 'Musical sonification' : 'Geophony'} mode`); }
-  if (patch.scale != null || patch.pitchLow != null || patch.pitchHigh != null || patch.spatialPhrases != null) {
+  if (patch.scale != null || patch.pitchLow != null || patch.pitchHigh != null || patch.spatialPhrases != null
+    || patch.reference != null || patch.harmony != null || patch.cues != null || patch.variation != null) {
     set({ eventsCache: null });
     if (controller.adapterId === 'monthly') controller.updateEvents(numericalEvents());
     if (controller.adapterId === 'seasonal') controller.updateEvents(seasonalEvents());
@@ -225,11 +263,60 @@ export function setTab(tab: Tab) {
   if (get().tab === tab) return;
   controller.pause('switched workspace');
   set({ tab, selectedEventId: null });
+  if (get().uiMode === 'preset') applyListeningPreset(get().listening[tab], { quiet: true });
   if (tab === 'numerical') attachNumerical({ keepIndex: true });
   else attachSeasonal();
   announce(tab === 'numerical' ? 'Numerical workspace' : 'Visual feed workspace');
 }
 export function setView(view: DataView) { set({ view }); }
+
+// ------------------------------------------------------------------ preset / advanced
+/** Switch the interface mode. It only changes which controls are shown; playback and data are untouched. */
+export function setUiMode(mode: UiMode) {
+  const s = get();
+  if (s.uiMode === mode) return;
+  writeUiMode(mode);
+  const patch: Partial<ReturnType<typeof get>> = { uiMode: mode };
+  if (mode === 'preset') {
+    if (s.view === 'metadata') patch.view = 'graph';
+    if (s.tab === 'numerical' && s.chartTab === 'score') patch.chartTab = 'roll';
+    if (s.graphTab === 'dist') patch.graphTab = 'describe';
+  }
+  set(patch);
+  announce(mode === 'preset' ? 'Preset mode: the essential controls and recommended listening settings.' : 'Advanced mode: every control is shown.');
+}
+
+/** Apply a listening preset: sound settings only — the dataset, selection and range never change. */
+export function applyListeningPreset(id: ListeningPresetId, opts: { quiet?: boolean } = {}) {
+  const p = getPreset(id);
+  if (!p) return;
+  set({ listening: { ...get().listening, [p.workspace]: id } });
+  updateSound({ ...p.sound });
+  if (p.image) setImage({ enabled: true, ...p.image });
+  if (!opts.quiet) announce(`Listening preset: ${p.label}. ${p.description}`);
+}
+
+/** Preset mode, numerical: one click loads the NASA sample, selects the Philippines and plays from the start. */
+export async function quickStart() {
+  void engine.start(); // unlock audio inside the click, before the download
+  if (!get().dataset || get().dataset!.kind !== 'nasa') await loadNasa();
+  if (!get().dataset) return;
+  selectRegion('philippines');
+  applyListeningPreset(get().listening.numerical ?? DEFAULT_PRESET.numerical, { quiet: true });
+  controller.seek(controller.range[0]);
+  if (controller.state === 'stopped') await togglePlay();
+}
+
+/** Preset mode, visual feed: one click imports the NASA frames, connects the climatology and plays. */
+export async function quickStartVisual() {
+  void engine.start();
+  if (get().media.state !== 'ready') await importVisualFeed();
+  if (get().media.state !== 'ready') return;
+  if (get().link.state !== 'reconstructed') await connectClimatology();
+  if (get().link.state !== 'reconstructed') return;
+  applyListeningPreset(get().listening.visual ?? DEFAULT_PRESET.visual, { quiet: true });
+  if (controller.state === 'stopped') await togglePlay();
+}
 
 // ------------------------------------------------------------------ visual feed (SVS 5478)
 const SVS = `${import.meta.env.BASE_URL}data/svs5478/`;
@@ -330,7 +417,8 @@ function seasonalEvents(): SoundEvent[][] {
   const ev = generateEvents(obs, {
     scale: sound.scale, pitchLow: sound.pitchLow, pitchHigh: sound.pitchHigh, spatialPhrases: false,
     datasetId: 'svs5478-clim', selectionId: obs[0]?.selectionId ?? '', stepLabel: (t) => `${labels[Number(t.slice(1)) - 1] ?? t} (seasonal average)`,
-  });
+    reference: sound.reference, harmony: sound.harmony, cues: sound.cues, variation: sound.variation,
+  }, [], seasonalContexts(obs.map((o) => o.value)));
   const steps = bucket(ev, obs.length);
   const { image, frameScan } = get();
   if (image.enabled && frameScan.doc && frameScan.bytes) {
@@ -420,11 +508,9 @@ export function exploreAt(row: number, col: number) {
   set({ explore: { row: r, col: c } });
   const v = g.value(r, c);
   const lat = +(g.latMin + (r + 0.5) * g.step).toFixed(2), lon = +(g.lonMin + (c + 0.5) * g.step).toFixed(2);
-  announce(describeCell(lat, lon, v, g.unit, g.derivation));
+  const ev = cellEvent(g, r, c, { scale: get().sound.scale, pitchLow: get().sound.pitchLow, pitchHigh: get().sound.pitchHigh });
+  announce(`${describeCell(lat, lon, v, g.unit, g.derivation)}${ev ? ` Note ${ev.note} (latitude band).` : v != null ? ' Dry: silent.' : ''}`);
   if (v == null) return;
-  const single: ScanGrid = { ...g, ncol: 1, lonMin: lon - g.step / 2, value: (rr) => (rr === r ? v : null) };
-  const ev = scanEvents(single, { scale: get().sound.scale, pitchLow: get().sound.pitchLow, pitchHigh: get().sound.pitchHigh,
-    stepIndex: 0, t: 'cursor', label: 'cursor', datasetId: 'cursor', selectionId: 'cursor' })[0];
   if (ev) void engine.ping(ev);
   if (get().a11y.haptics && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
     try { navigator.vibrate(Math.round(10 + 70 * Math.sqrt(Math.min(1, v / g.refMax)))); } catch { /* unsupported */ }
@@ -474,6 +560,7 @@ export function saveProject() {
     speed: s.speed, loop: s.loop, sound: s.sound, view: s.view, tab: s.tab,
     visual: { imported: s.media.state === 'ready', linked: s.link.state === 'reconstructed', regionId: s.visual.regionId, day: s.visual.day, mode: s.visual.mode, roi: s.visual.roi, speed: s.visual.speed },
     a11y: s.a11y,
+    uiMode: s.uiMode,
   };
   const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -493,7 +580,8 @@ export async function openProject(file: File): Promise<string[]> {
     doc = parsed.data;
   } catch (e) { return [`Could not read ${file.name}: ${(e as Error).message}`]; }
   controller.pause('project opened');
-  set({ sound: { ...DEFAULT_SOUND, ...doc.sound }, speed: doc.speed, loop: doc.loop, view: doc.view, a11y: { ...get().a11y, ...doc.a11y } });
+  if (doc.uiMode) setUiMode(doc.uiMode);
+  set({ sound: { ...DEFAULT_SOUND, ...doc.sound, layers: { ...DEFAULT_SOUND.layers, ...(doc.sound?.layers ?? {}) } }, speed: doc.speed, loop: doc.loop, view: doc.view, a11y: { ...get().a11y, ...doc.a11y } });
   engine.setInstrument(get().sound.instrument); engine.setMaster(get().sound.master); engine.setLevels(get().sound.layers);
   controller.setLoop(doc.loop);
   if (doc.dataset?.kind === 'nasa') await loadNasa();
@@ -519,14 +607,36 @@ export async function openProject(file: File): Promise<string[]> {
 }
 
 // ------------------------------------------------------------------ legend
-export function legendEvents(kind: 'low' | 'middle' | 'high' | 'zero' | 'missing'): SoundEvent[] {
-  const value = { low: 0.05, middle: 0.4, high: 1.2, zero: 0, missing: null }[kind];
+export type LegendKind = 'low' | 'middle' | 'high' | 'zero' | 'missing' | 'near-normal' | 'wetter' | 'much-wetter' | 'drier' | 'much-drier' | 'unusual';
+
+/** Legend examples: a July whose normal is 0.35 mm/hr (sd 0.07), so the comparison cases sound exactly like playback. */
+export const LEGEND_NORMAL = { mean: 0.35, sd: 0.07 };
+const LEGEND_VALUES: Record<LegendKind, number | null> = {
+  low: 0.05, middle: 0.4, high: 0.75, zero: 0, missing: null,
+  'near-normal': 0.36, wetter: 0.42, 'much-wetter': 0.48, drier: 0.28, 'much-drier': 0.24, unusual: 0.55,
+};
+
+export function legendEvents(kind: LegendKind): SoundEvent[] {
+  const value = LEGEND_VALUES[kind];
   const { sound } = get();
-  const obs: Observation[] = [{ id: `legend|${kind}`, t: 'legend', start: '', end: '', value, unit: 'mm/hr', quality: value == null ? 'missing' : 'valid', selectionId: 'legend', selectionType: 'area', aggregation: 'legend example' }];
-  return generateEvents(obs, { scale: sound.scale, pitchLow: sound.pitchLow, pitchHigh: sound.pitchHigh, spatialPhrases: false, datasetId: 'legend', selectionId: 'legend', stepLabel: () => `Legend: ${kind}` });
+  const obs: Observation[] = [{ id: `legend|${kind}`, t: '1999-07', start: '', end: '', value, unit: 'mm/hr', quality: value == null ? 'missing' : 'valid', selectionId: 'legend', selectionType: 'area', aggregation: 'legend example' }];
+  const comparing = !['low', 'middle', 'high', 'zero'].includes(kind);
+  let contexts: StepContext[] | undefined;
+  if (comparing) {
+    // the same rule playback uses: same-month normals over the baseline years
+    const { mean: m, sd } = LEGEND_NORMAL; // five baseline Julys with exactly this mean and sample SD
+    const synthetic: Observation[] = [m - sd, m, m + sd, m - sd, m + sd]
+      .map((v, k) => ({ ...obs[0], id: `legend|n${k}`, t: `${2002 + k}-07`, value: v, quality: 'valid' }));
+    contexts = monthlyContexts([...obs, ...synthetic]).slice(0, 1);
+  }
+  return generateEvents(obs, {
+    scale: sound.scale, pitchLow: sound.pitchLow, pitchHigh: sound.pitchHigh, spatialPhrases: false, datasetId: 'legend', selectionId: 'legend', stepLabel: () => `Legend: ${kind}`,
+    reference: sound.reference, harmony: sound.harmony, cues: sound.cues, variation: false,
+  }, [], contexts).filter((e) => e.marker !== 'year');
 }
-export async function audition(kind: 'low' | 'middle' | 'high' | 'zero' | 'missing') {
+export async function audition(kind: LegendKind) {
   if (controller.state !== 'stopped') controller.pause('legend audition');
+  stopSpeaking();
   await engine.audition(legendEvents(kind), get().sound.mode);
   announce(`Legend example: ${kind}${kind === 'missing' ? ' — a muted thud and no note' : ''}`);
 }

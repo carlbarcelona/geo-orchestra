@@ -11,7 +11,7 @@ export const INSTRUMENTS: { id: InstrumentId; label: string }[] = [
   { id: 'marimba', label: 'Marimba' },
 ];
 
-export interface LayerLevels { melody: number; texture: number; markers: number; image: number }
+export interface LayerLevels { melody: number; texture: number; markers: number; image: number; context: number }
 
 function gainToDb(g: number) { return g <= 0.0001 ? -Infinity : 20 * Math.log10(g); }
 
@@ -35,6 +35,16 @@ class SoundEngine {
   private textureCh!: Tone.Channel;
   private markerCh!: Tone.Channel;
   private imageCh!: Tone.Channel;
+  private contextCh!: Tone.Channel;
+  private refVoice!: Tone.Synth;
+  private refOn = false;
+  private harmony!: Tone.PolySynth;
+  private bell!: Tone.FMSynth;
+  private thunderEnv!: Tone.AmplitudeEnvelope;
+  private thunderNoise!: Tone.Noise;
+  private windEnv!: Tone.AmplitudeEnvelope;
+  private windFilter!: Tone.Filter;
+  private windNoise!: Tone.Noise;
   private scanPool: { panner: Tone.Panner; synth: Tone.Synth }[] = [];
   private scanNext = 0;
   private featureVoice!: Tone.Synth;
@@ -50,7 +60,7 @@ class SoundEngine {
   private dropFilter!: Tone.Filter;
   private markerSynth!: Tone.Synth;
   private gapSynth!: Tone.MembraneSynth;
-  private levels: LayerLevels = { melody: 0.8, texture: 0.75, markers: 0.5, image: 0.7 };
+  private levels: LayerLevels = { melody: 0.8, texture: 0.75, markers: 0.5, image: 0.7, context: 0.55 };
   private masterGain = 0.8;
   available = true;
   lastError: string | null = null;
@@ -78,11 +88,22 @@ class SoundEngine {
     this.textureCh = new Tone.Channel({ volume: gainToDb(this.levels.texture) }).connect(this.master);
     this.markerCh = new Tone.Channel({ volume: gainToDb(this.levels.markers) }).connect(this.master);
     this.imageCh = new Tone.Channel({ volume: gainToDb(this.levels.image) }).connect(this.reverb);
+    this.contextCh = new Tone.Channel({ volume: gainToDb(this.levels.context) }).connect(this.reverb);
+    // the normal "hum": a soft sustained sine that glides to each step's reference pitch
+    this.refVoice = new Tone.Synth({ oscillator: { type: 'sine' }, portamento: 0.15, envelope: { attack: 0.35, decay: 0.2, sustain: 0.85, release: 0.6 } }).connect(this.contextCh);
+    this.refVoice.volume.value = -13;
+    // wetter/drier harmony: a quiet pad under the melody
+    this.harmony = new Tone.PolySynth(Tone.AMSynth, { harmonicity: 1.5, envelope: { attack: 0.18, decay: 0.3, sustain: 0.6, release: 0.9 } } as any).connect(this.contextCh);
+    this.harmony.maxPolyphony = 16;
+    this.harmony.volume.value = -19;
+    // unusual-month bell
+    this.bell = new Tone.FMSynth({ harmonicity: 3.5, modulationIndex: 8, envelope: { attack: 0.001, decay: 0.9, sustain: 0, release: 0.6 }, modulationEnvelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.3 } } as any).connect(this.contextCh);
+    this.bell.volume.value = -10;
     // frame-scan voices: a pool of panned bell tones (west = left, east = right)
     for (let i = 0; i < 14; i++) {
       const panner = new Tone.Panner(0).connect(this.imageCh);
-      const synth = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.004, decay: 0.22, sustain: 0.05, release: 0.25 } }).connect(panner);
-      synth.volume.value = -9;
+      const synth = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.004, decay: 0.22, sustain: 0.05, release: 0.25 } }).connect(panner);
+      synth.volume.value = -8;
       this.scanPool.push({ panner, synth });
     }
     // feature voice: a gliding string tone that follows the rain-band latitude
@@ -107,6 +128,15 @@ class SoundEngine {
     this.markerSynth = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.05 } }).connect(this.markerCh);
     this.gapSynth = new Tone.MembraneSynth({ pitchDecay: 0.02, octaves: 2, envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.1 } }).connect(this.markerCh);
     this.gapSynth.volume.value = -8;
+    // geophony cues: distant thunder (much wetter than normal) and dry wind (much drier)
+    this.thunderEnv = new Tone.AmplitudeEnvelope({ attack: 0.35, decay: 1.4, sustain: 0, release: 0.6 }).connect(this.textureCh);
+    const thunderFilter = new Tone.Filter({ type: 'lowpass', frequency: 180, Q: 0.7 }).connect(this.thunderEnv);
+    this.thunderNoise = new Tone.Noise('brown').connect(thunderFilter);
+    this.thunderNoise.volume.value = 4;
+    this.windEnv = new Tone.AmplitudeEnvelope({ attack: 0.5, decay: 0.5, sustain: 0.5, release: 0.7 }).connect(this.textureCh);
+    this.windFilter = new Tone.Filter({ type: 'bandpass', frequency: 500, Q: 1.8 }).connect(this.windEnv);
+    this.windNoise = new Tone.Noise('white').connect(this.windFilter);
+    this.windNoise.volume.value = -10;
     this.built = true;
   }
 
@@ -151,23 +181,36 @@ class SoundEngine {
     this.textureCh.volume.rampTo(gainToDb(l.texture), 0.05);
     this.markerCh.volume.rampTo(gainToDb(l.markers), 0.05);
     this.imageCh.volume.rampTo(gainToDb(l.image), 0.05);
+    this.contextCh.volume.rampTo(gainToDb(l.context ?? 0.55), 0.05);
   }
 
   /** Schedule one step's events at audio time `time`, lasting `stepSeconds`. */
   playStep(events: SoundEvent[], time: number, stepSeconds: number, mode: SoundMode) {
     if (!this.built) return;
     let textureSet = false;
+    let refSeen = false;
     for (const ev of events) {
       const at = time + ev.offset * stepSeconds;
       const dur = Math.max(0.06, ev.duration * stepSeconds);
+      if (ev.kind === 'reference' && ev.midi != null) {
+        refSeen = true;
+        const f = Tone.Frequency(ev.midi, 'midi').toFrequency();
+        if (!this.refOn) { this.refVoice.triggerAttack(f, at, ev.velocity ?? 0.3); this.refOn = true; }
+        else this.refVoice.setNote(f, at);
+        continue;
+      }
+      if (ev.kind === 'chord' && ev.chord) {
+        if (mode === 'musical') this.harmony.triggerAttackRelease(ev.chord.map((m) => Tone.Frequency(m, 'midi').toFrequency()), dur, at, ev.velocity ?? 0.3);
+        continue;
+      }
       if (ev.kind === 'scan' && ev.midi != null) {
         const slot = this.scanPool[this.scanNext++ % this.scanPool.length];
         slot.panner.pan.setValueAtTime(ev.pan ?? 0, at);
-        slot.synth.triggerAttackRelease(Tone.Frequency(ev.midi + 12, 'midi').toFrequency(), Math.min(dur, 0.35), at, ev.velocity ?? 0.5);
+        slot.synth.triggerAttackRelease(Tone.Frequency(ev.midi, 'midi').toFrequency(), Math.min(dur, 0.35), at, ev.velocity ?? 0.5);
         continue;
       }
       if (ev.kind === 'feature' && ev.midi != null) {
-        const f = Tone.Frequency(ev.midi - 12, 'midi').toFrequency();
+        const f = Tone.Frequency(ev.midi, 'midi').toFrequency();
         if (!this.featureOn) { this.featureVoice.triggerAttack(f, at, ev.velocity ?? 0.4); this.featureOn = true; }
         else this.featureVoice.setNote(f, at);
         continue;
@@ -177,6 +220,8 @@ class SoundEngine {
         else if (ev.marker === 'missing') this.gapSynth.triggerAttackRelease('C2', 0.15, at, 0.5);
         else if (ev.marker === 'year' && mode === 'musical') this.markerSynth.triggerAttackRelease('C7', 0.03, at, 0.25);
         else if (ev.marker === 'zero') this.markerSynth.triggerAttackRelease('G6', 0.05, at, 0.5);
+        else if (ev.marker === 'extreme') { this.bell.triggerAttackRelease('A5', 0.3, at, 0.55); this.bell.triggerAttackRelease('E6', 0.3, at + 0.14, 0.45); }
+        else if (ev.marker === 'region') this.markerSynth.triggerAttackRelease('C7', 0.02, at, 0.18);
         continue;
       }
       if (mode === 'musical' && ev.kind === 'melody' && ev.midi != null) {
@@ -190,6 +235,7 @@ class SoundEngine {
         this.scheduleRain(ev, at, stepSeconds);
       }
     }
+    if (this.refOn && !refSeen) { this.refVoice.triggerRelease(time); this.refOn = false; }
     if (mode === 'geophony' && !textureSet) {
       // missing step: the rain bed fades out (silence is the honest sound of no measurement)
       this.ensureNoise();
@@ -215,6 +261,17 @@ class SoundEngine {
       const f = 1800 + rnd() * 3600;
       this.drops.triggerAttackRelease(f, 0.03, when, 0.15 + rnd() * 0.5 * t.intensity);
     }
+    if (ev.cue === 'thunder') {
+      if (this.thunderNoise.state !== 'started') this.thunderNoise.start();
+      this.thunderEnv.triggerAttackRelease(Math.min(1.2, stepSeconds * 0.6), at + stepSeconds * 0.1, 0.9);
+    } else if (ev.cue === 'wind') {
+      if (this.windNoise.state !== 'started') this.windNoise.start();
+      const d = Math.min(1.4, stepSeconds * 0.8);
+      this.windFilter.frequency.cancelScheduledValues(at);
+      this.windFilter.frequency.setValueAtTime(380, at);
+      this.windFilter.frequency.linearRampToValueAtTime(1500, at + d);
+      this.windEnv.triggerAttackRelease(d, at, 0.8);
+    }
   }
 
   /** Immediately silence everything scheduled or sounding (seek, pause, mode change). */
@@ -226,6 +283,10 @@ class SoundEngine {
     this.samplers.forEach((s) => s.synth.triggerRelease(now));
     this.scanPool.forEach((s) => s.synth.triggerRelease(now));
     if (this.featureOn) { this.featureVoice.triggerRelease(now); this.featureOn = false; }
+    if (this.refOn) { this.refVoice.triggerRelease(now); this.refOn = false; }
+    this.harmony.releaseAll(now);
+    this.thunderEnv.triggerRelease(now);
+    this.windEnv.triggerRelease(now);
     this.rainGain.gain.cancelScheduledValues(now);
     this.rainGain.gain.setValueAtTime(this.rainGain.gain.value, now);
     this.rainGain.gain.linearRampToValueAtTime(0, now + 0.15);
@@ -257,6 +318,7 @@ class SoundEngine {
     if (mode === 'geophony') {
       this.rainGain.gain.linearRampToValueAtTime(0, t0 + 1.6);
     }
+    if (this.refOn) { this.refVoice.triggerRelease(t0 + 1.3); this.refOn = false; }
   }
 }
 

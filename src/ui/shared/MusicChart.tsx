@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SoundEvent } from '../../contracts';
 import { controller } from '../../playback/controller';
 import { midiToName } from '../../sound/mapping';
+import { comparePhrase, explainStep, rankPhrase } from '../../sound/context';
 import { useStore, set } from '../../state/store';
 import { seek, setSpeed, stepBy, togglePlay, toggleLoop } from '../../state/actions';
 import * as I from '../icons';
@@ -21,7 +22,13 @@ interface Props {
   rightInfo?: React.ReactNode;
   footNote?: string;
   score?: { label: string; node: React.ReactNode; available: boolean; events: SoundEvent[] };
+  /** label used in the "Now hearing" caption (defaults to the axis label of the step) */
+  captionLabel?: (i: number) => string;
 }
+
+const WET = '#38bdf8', DRY = '#fb923c';
+const isWet = (c?: string | null) => c === 'wetter' || c === 'much-wetter';
+const isDry = (c?: string | null) => c === 'drier' || c === 'much-drier';
 
 const LOW = 48, HIGH = 84; // C3..C6 display range
 const BLACK = new Set([1, 3, 6, 8, 10]);
@@ -33,6 +40,7 @@ export function MusicChart(p: Props) {
   const selectedId = useStore((s) => s.selectedEventId);
   const reduced = useStore((s) => s.a11y.reducedMotion);
   const mode = useStore((s) => s.sound.mode);
+  const preset = useStore((s) => s.uiMode === 'preset');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 220 });
@@ -86,6 +94,13 @@ export function MusicChart(p: Props) {
       ctx.fillText('Playback (s)', 12, 16);
       ctx.fillText(p.axisTitle, 12, 38);
       ctx.fillText('Rainfall', 12, top + pitchH / 2 - 4); ctx.fillText(mode === 'musical' ? 'melody' : 'melody (muted)', 12, top + pitchH / 2 + 12);
+      if ((p.events[p.cursor] ?? []).some((e) => e.kind === 'reference') || p.events.some((st) => st.some((e) => e.kind === 'reference'))) {
+        ctx.strokeStyle = '#e6eef5'; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(12, top + pitchH / 2 + 28); ctx.lineTo(34, top + pitchH / 2 + 28); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillText('normal (hum)', 40, top + pitchH / 2 + 32);
+        ctx.fillStyle = WET; ctx.fillText('▲ wetter', 12, top + pitchH / 2 + 50);
+        ctx.fillStyle = DRY; ctx.fillText('▼ drier', 70, top + pitchH / 2 + 50);
+        ctx.fillStyle = '#a9bccb';
+      }
       ctx.fillText('Rain texture', 12, texY + laneTex / 2 + 4);
       ctx.fillText('Event markers', 12, markY + laneMark / 2 + 4);
 
@@ -126,12 +141,23 @@ export function MusicChart(p: Props) {
         for (const ev of p.events[s] ?? []) {
           const x = sx(s + ev.offset), w = Math.max(3, ev.duration * stepW - 2);
           const sel = ev.id === selectedId;
-          if (ev.kind === 'melody' && ev.midi != null) {
+          if (ev.kind === 'reference' && ev.midi != null) {
+            const y = py(ev.midi);
+            ctx.strokeStyle = sel ? '#f5b942' : 'rgba(230,238,245,0.75)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+            ctx.beginPath(); ctx.moveTo(sx(s) + 1, y); ctx.lineTo(sx(s + 1) - 1, y); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
+            hits.push({ x: sx(s), y: y - 3, w: stepW, h: 6, ev });
+          } else if (ev.kind === 'melody' && ev.midi != null) {
             const y = py(ev.midi) - 4;
+            const cat = ev.context?.category;
             ctx.fillStyle = sel ? '#f5b942' : isCur ? '#c4b5fd' : '#8b6ff0';
             ctx.globalAlpha = mode === 'musical' ? 1 : 0.4;
             roundRect(ctx, x, y, w, 8, 2); ctx.fill();
+            if (isWet(cat) || isDry(cat)) { ctx.strokeStyle = isWet(cat) ? WET : DRY; ctx.lineWidth = cat!.startsWith('much') ? 2.5 : 1.5; roundRect(ctx, x, y, w, 8, 2); ctx.stroke(); ctx.lineWidth = 1; }
             if (ev.marker === 'clipped') { ctx.fillStyle = '#f87171'; ctx.fillRect(x + w - 3, y, 3, 8); }
+            if (stepW > 14 && (isWet(cat) || isDry(cat))) {
+              ctx.fillStyle = isWet(cat) ? WET : DRY; ctx.font = '10px Inter, sans-serif';
+              ctx.fillText(isWet(cat) ? '▲' : '▼', x + 1, isWet(cat) ? y - 3 : y + 18);
+            }
             ctx.globalAlpha = 1;
             hits.push({ x, y: y - 2, w, h: 12, ev });
           } else if (ev.kind === 'sample' && ev.midi != null) {
@@ -153,6 +179,14 @@ export function MusicChart(p: Props) {
             for (let k = 0; k < dots; k++) ctx.fillRect(sx(s) + 2 + ((k * 37) % Math.max(4, stepW - 4)), texY + 3 + ((k * 13) % 10), 1.5, 1.5);
             hits.push({ x: sx(s), y: texY, w: stepW, h: laneTex, ev });
           } else if (ev.kind === 'marker') {
+            if (ev.marker === 'region' || ev.marker === 'clipped') continue;
+            if (ev.marker === 'extreme') {
+              ctx.fillStyle = sel ? '#f5b942' : '#fde68a';
+              ctx.beginPath(); const cx = sx(s) + 10, cy = markY + laneMark / 2; ctx.moveTo(cx, cy - 6); ctx.lineTo(cx + 6, cy); ctx.lineTo(cx, cy + 6); ctx.lineTo(cx - 6, cy); ctx.fill();
+              if (stepW > 40) { ctx.font = '10px Inter, sans-serif'; ctx.fillText('unusual', sx(s) + 18, markY + 17); }
+              hits.push({ x: sx(s), y: markY, w: 20, h: laneMark, ev });
+              continue;
+            }
             if (ev.marker === 'missing') {
               ctx.fillStyle = 'rgba(248,113,113,0.12)'; ctx.fillRect(sx(s) + 1, top, stepW - 2, markY + laneMark - top);
               ctx.strokeStyle = 'rgba(248,113,113,0.7)'; ctx.setLineDash([4, 3]); ctx.strokeRect(sx(s) + 1, top, stepW - 2, markY + laneMark - top); ctx.setLineDash([]);
@@ -194,8 +228,11 @@ export function MusicChart(p: Props) {
 
   const curEvents = p.events[p.cursor] ?? [];
   const primary = curEvents.find((e) => e.kind === 'melody') ?? curEvents.find((e) => e.kind === 'marker');
-  const rollLabel = primary ? `Piano roll. Current step ${p.stepLabels[p.cursor]}: ${primary.explanation}` : 'Piano roll';
+  const caption = p.enabled && curEvents.some((e) => e.kind === 'melody' || e.kind === 'texture' || e.marker === 'missing')
+    ? explainStep(curEvents, mode, p.captionLabel?.(p.cursor) ?? p.stepLabels[p.cursor] ?? '') : '';
+  const rollLabel = caption ? `Piano roll. ${caption}` : primary ? `Piano roll. Current step ${p.stepLabels[p.cursor]}: ${primary.explanation}` : 'Piano roll';
   const playing = playback !== 'stopped';
+  const capCat = (curEvents.find((e) => e.kind === 'melody') ?? curEvents.find((e) => e.kind === 'texture'))?.context?.category;
 
   return (
     <section className="panel span-all" aria-labelledby="chart-title" style={{ flex: 1 }}>
@@ -223,6 +260,12 @@ export function MusicChart(p: Props) {
           {p.rightInfo}
         </div>
       </div>
+      {caption && (
+        <div className={`caption-strip ${preset ? 'big' : ''} ${isWet(capCat) ? 'wet' : isDry(capCat) ? 'dry' : ''}`} aria-live="off">
+          <span className="caption-tag">Now hearing</span>
+          <span className="caption-text">{caption}</span>
+        </div>
+      )}
       {tab === 'score' && p.score ? (
         <div className="chart-area" style={{ display: 'flex', flexDirection: 'column' }}>{p.score.node}</div>
       ) : !p.enabled && !(tab === 'details' && selected) ? (
@@ -232,7 +275,7 @@ export function MusicChart(p: Props) {
           <canvas ref={canvasRef} role="img" aria-label={rollLabel} onClick={onCanvasClick} style={{ cursor: 'pointer' }} />
           {selected && (
             <button className="chip amber" style={{ position: 'absolute', right: 14, top: 52, cursor: 'pointer' }} onClick={() => set({ chartTab: 'details' })}>
-              {selected.kind === 'texture' ? 'Rainfall → texture' : selected.kind === 'marker' ? 'Marker' : 'Rainfall → note'} · Inspect event
+              {selected.kind === 'texture' ? 'Rainfall → texture' : selected.kind === 'reference' ? 'Normal → hum' : selected.kind === 'chord' ? 'Wetter/drier → chord' : selected.kind === 'marker' ? 'Marker' : 'Rainfall → note'} · Inspect event
             </button>
           )}
         </div>
@@ -262,8 +305,11 @@ function EventDetails({ selected, current, label }: { selected: SoundEvent | nul
             <dt>Observation</dt><dd>{e.original.label}</dd>
             <dt>Original value</dt><dd>{e.original.value == null ? 'missing' : e.kind === 'feature' ? `rain band ${e.original.value.toFixed(2)}° latitude` : `${e.original.value.toFixed(4)} ${e.original.unit}`}</dd>
             {e.original.derivation && <><dt>Derivation</dt><dd>{e.original.derivation}{e.original.derivation === 'image-derived' ? ' (decoded from NASA colorbar, approximate)' : ''}</dd></>}
-            {e.scan && <><dt>Location</dt><dd>{e.scan.lat}°, {e.scan.lon}°E</dd></>}
-            {e.midi != null && <><dt>Note</dt><dd>{e.note} (MIDI {e.midi}) · vel {e.velocity}</dd></>}
+            {e.scan && e.kind === 'scan' && <><dt>Location</dt><dd>{e.scan.latBand ? `${e.scan.latBand[0]}…${e.scan.latBand[1]}°` : `${e.scan.lat}°`}, {e.scan.lon}°E{e.scan.beat != null ? ` · beat ${e.scan.beat + 1}` : ''}</dd></>}
+            {e.scan?.intensity && <><dt>Rain class</dt><dd>{e.scan.intensity}</dd></>}
+            {e.midi != null && <><dt>Note</dt><dd>{e.chord ? e.chord.map(midiToName).join(' ') : e.note} (MIDI {e.chord ? e.chord.join(',') : e.midi}) · vel {e.velocity}</dd></>}
+            {e.context?.normal != null && <><dt>Normal</dt><dd>{e.context.normal.toFixed(4)} mm/hr <span style={{ fontFamily: 'var(--font)' }}>({e.context.baseline})</span></dd></>}
+            {e.context?.anomaly != null && <><dt>Compared</dt><dd style={{ fontFamily: 'var(--font)' }}>{e.context.anomaly >= 0 ? '+' : ''}{e.context.anomaly.toFixed(4)} mm/hr{e.context.z != null ? ` · z ${e.context.z.toFixed(2)}` : ''} · {comparePhrase(e.context)}{rankPhrase(e.context) ? ` · ${rankPhrase(e.context)}` : ''}</dd></>}
             {e.pan != null && e.kind === 'sample' && <><dt>Stereo pan</dt><dd>{e.pan}</dd></>}
             {e.texture && <><dt>Texture</dt><dd>{e.texture.dropsPerSecond} drops/s · intensity {e.texture.intensity}</dd></>}
             <dt>Selection</dt><dd>{e.selectionId}</dd>

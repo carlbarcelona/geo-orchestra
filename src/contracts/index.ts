@@ -67,7 +67,20 @@ export interface Observation {
 }
 
 // ---------- 3. Sound event ----------
-export type SoundEventKind = 'melody' | 'sample' | 'texture' | 'marker' | 'scan' | 'feature';
+export type SoundEventKind = 'melody' | 'sample' | 'texture' | 'marker' | 'scan' | 'feature' | 'reference' | 'chord';
+
+/** How a value compares with its reference ("normal"). Wetter/drier categories are designed listening aids, not new measurements. */
+export type AnomalyCategory = 'much-drier' | 'drier' | 'near-normal' | 'wetter' | 'much-wetter';
+export interface StepContext {
+  normal: number | null;        // reference value in the same unit as the observation
+  anomaly: number | null;       // value - normal
+  z: number | null;             // anomaly / sd of the same calendar month (monthly) — null for seasonal
+  ratio: number | null;         // value / normal
+  category: AnomalyCategory | null;
+  rank: { position: number; of: number; wettest: boolean } | null; // e.g. 3rd wettest of 25
+  baseline: string;             // '2001–2022 same-month mean' | 'annual mean of the seasonal cycle'
+  periodLabel: string;          // e.g. 'July' or 'the yearly average'
+}
 
 export interface SoundEvent {
   id: string;
@@ -84,8 +97,11 @@ export interface SoundEvent {
   velocity?: number;     // 0..1
   pan?: number;          // -1..1
   texture?: { dropsPerSecond: number; intensity: number; brightness: number };
-  marker?: 'missing' | 'zero' | 'year' | 'clipped' | 'turn';
-  scan?: { col: number; row: number; lat: number; lon: number };
+  marker?: 'missing' | 'zero' | 'year' | 'clipped' | 'turn' | 'extreme' | 'region';
+  scan?: { col: number; row: number; lat: number; lon: number; beat?: number; latBand?: [number, number]; intensity?: string };
+  chord?: number[];      // MIDI notes of a harmony event
+  cue?: 'thunder' | 'wind';
+  context?: StepContext;
   mappingVersion: string;
   explanation: string;
 }
@@ -177,5 +193,6 @@ export const ProjectFileSchema = z.object({
   tab: z.enum(['numerical', 'visual']),
   visual: z.object({ imported: z.boolean(), linked: z.boolean(), regionId: z.string(), day: z.number(), mode: z.enum(['frame', 'timelapse']), roi: z.boolean(), speed: z.number() }),
   a11y: z.any(),
+  uiMode: z.enum(['preset', 'advanced']).optional(), // added with rain-v2; older project files omit it
 });
 export type ProjectFile = z.infer<typeof ProjectFileSchema>;

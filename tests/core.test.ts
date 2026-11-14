@@ -8,7 +8,7 @@ import type { Observation, SoundEvent } from '../src/contracts';
 import { areaMean, successiveChange } from '../src/data/aggregate';
 import { parseProcessedFile } from '../src/data/loaders';
 import { PlaybackController, type TransportLike } from '../src/playback/controller';
-import { generateEvents, geophonyParams, lonToPan, MAPPING, normalize } from '../src/sound/mapping';
+import { generateEvents, geophonyParams, lonToPan, MAPPING, normalize, referenceRangeFor, stepSize } from '../src/sound/mapping';
 
 const obs = (vals: (number | null)[], start = 2024): Observation[] => vals.map((v, i) => {
   const t = `${start}-${String(i + 1).padStart(2, '0')}`;
@@ -33,8 +33,11 @@ describe('missing versus zero', () => {
   });
   it('change is not computed across a gap', () => {
     expect(successiveChange([0.2, null, 0.5, 0.6])).toEqual([null, null, null, expect.closeTo(0.1, 6)]);
-    const ev = generateEvents(obs([0.1, null, 0.9]), opts);
+    const ev = generateEvents(obs([0.1, null, 0.9]), { ...opts, variation: true });
     expect(ev.filter((e) => e.stepIndex === 2 && e.kind === 'melody')).toHaveLength(1); // no density from the jump over the gap
+    const ev2 = generateEvents(obs([0.1, 0.5]), { ...opts, variation: true });
+    expect(ev2.filter((e) => e.stepIndex === 1 && e.kind === 'melody').length).toBeGreaterThan(1); // variation adds notes when there is no gap
+    expect(generateEvents(obs([0.1, 0.5]), opts).filter((e) => e.stepIndex === 1 && e.kind === 'melody')).toHaveLength(1); // off by default
   });
 });
 
@@ -71,12 +74,27 @@ describe('fixed, deterministic mapping', () => {
     expect(e.marker).toBe('clipped');
     expect(e.original.value).toBe(2.2);
     expect(e.midi).toBe(84);
-    expect(MAPPING.referenceRange).toEqual([0, 1.5]);
+    expect(MAPPING.ranges).toEqual({ area: [0, 0.8], cell: [0, 1.5] });
+  });
+  it('pitch is linear on a fixed range per selection type', () => {
+    expect(referenceRangeFor('area')).toEqual([0, 0.8]);
+    expect(referenceRangeFor('cell')).toEqual([0, 1.5]);
+    expect(stepSize('area', 16)).toBeCloseTo(0.8 / 15, 9);
+    expect(normalize(0.4, [0, 0.8])!.n).toBeCloseTo(0.5, 9);
+    // area 0.4 mm/hr sits mid-range (note 8 of 16 → index 8 rounds from 7.5); a cell with the same value sits lower
+    const area = generateEvents(obs([0.4]), opts).find((e) => e.kind === 'melody')!;
+    const cellObs = obs([0.4]).map((o) => ({ ...o, selectionType: 'cell' as const }));
+    const cell = generateEvents(cellObs, opts).find((e) => e.kind === 'melody')!;
+    expect(area.midi!).toBeGreaterThan(cell.midi!);
+    // a cell above 0.8 is not clipped, an area mean is
+    const cellHi = generateEvents(obs([1.0]).map((o) => ({ ...o, selectionType: 'cell' as const })), opts).find((e) => e.kind === 'melody')!;
+    expect(cellHi.marker).toBeUndefined();
+    expect(generateEvents(obs([1.0]), opts).find((e) => e.kind === 'melody')!.marker).toBe('clipped');
   });
   it('instrument-independent: events carry no instrument and keep source ids', () => {
     const e = generateEvents(obs([0.3]), opts)[0];
     expect(e.sourceObservationIds).toEqual(['ds|area:x|2024-01']);
-    expect(e.mappingVersion).toBe('rain-v1');
+    expect(e.mappingVersion).toBe('rain-v2');
   });
   it('geophony increases with rainfall and is null for missing', () => {
     expect(geophonyParams(null, null)).toBeNull();

@@ -2,10 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { controller } from '../../playback/controller';
 import {
   connectClimatology, currentScanEvents, currentScanGrid, disconnectClimatology, exploreAt, exploreMove, frameReady, importVisualFeed, loadFrame,
-  scanCurrent, seasonalEventsCached, seasonalObservations, seek, setImage, setTab, setVisual, setVisualRegion, svsUrl, togglePlay,
+  quickStartVisual, scanCurrent, seasonalEventsCached, seasonalObservations, seek, setImage, setTab, setVisual, setVisualRegion, svsUrl, togglePlay,
 } from '../../state/actions';
-import { describeFrame } from '../../a11y/braille';
-import { columnProfile } from '../../sound/frameScan';
+import { describeFrame, describeSweep } from '../../a11y/braille';
+import { seasonalContexts } from '../../sound/context';
+import { MAPPING } from '../../sound/mapping';
+import { columnProfile, SCAN } from '../../sound/frameScan';
+import { ListeningGuide, ListeningPresetCards, NarrationToggle } from '../preset/PresetPanels';
 import { BrailleChart } from '../shared/BrailleChart';
 import { FrameScore, useSweepProgress } from '../shared/FrameScore';
 import { set, useStore } from '../../state/store';
@@ -31,12 +34,13 @@ export function VisualWorkspace() {
   const grid = useMemo(() => currentScanGrid(), [visual.day, frameScan.state, image.enabled, media.state]); // eslint-disable-line react-hooks/exhaustive-deps
   const scanEvents = useMemo(() => (grid ? currentScanEvents() : []), [grid, sound.scale, sound.pitchLow, sound.pitchHigh]); // eslint-disable-line react-hooks/exhaustive-deps
   const frameLabel = media.manifest?.frames[visual.day]?.label;
+  const preset = useStore((s) => s.uiMode === 'preset');
   return (
-    <main id="main" className="workspace visual" aria-label="Visual feed workspace">
-      <NasaDataPanel />
-      <VisualFeed />
-      <SoundStudio />
-      <SeasonalGraph />
+    <main id="main" className={`workspace visual ${preset ? 'preset' : ''}`} aria-label="Visual feed workspace">
+      <NasaDataPanel preset={preset} />
+      <VisualFeed preset={preset} />
+      {preset ? <PresetSoundStudio /> : <SoundStudio />}
+      <SeasonalGraph preset={preset} />
       <div className="span-2" style={{ display: 'flex', minHeight: 0, minWidth: 0 }}>
         <MusicChart
           events={events} stepLabels={labels} axisTitle="Seasonal day"
@@ -44,6 +48,7 @@ export function VisualWorkspace() {
           enabled={linked} emptyTitle={media.state === 'ready' ? 'Audio events appear after source alignment' : 'Audio events appear after source alignment'}
           emptyHint={media.state !== 'ready' ? 'No media timeline loaded' : 'Connect matching climatology data in Sound Studio'}
           rightInfo={media.manifest && <span className="chip mono">Day {visual.day + 1}</span>}
+          captionLabel={(i) => `${labels[i] ?? ''} (seasonal average, ${REGION_NAMES[visual.regionId]})`}
           footNote="Video frame index ≠ calendar day · each frame's date is read from the SVS date overlays (366 days, incl. Feb 29)"
           score={{
             label: 'Frame score', available: !!grid, events: scanEvents,
@@ -56,9 +61,10 @@ export function VisualWorkspace() {
   );
 }
 
-function NasaDataPanel() {
+function NasaDataPanel({ preset }: { preset: boolean }) {
   const media = useStore((s) => s.media);
   const link = useStore((s) => s.link);
+  if (preset) return <PresetNasaPanel />;
   const [tab, setTabState] = useState<'catalogue' | 'project'>('catalogue');
   const [q, setQ] = useState('');
   const match = (t: string) => !q || t.toLowerCase().includes(q.toLowerCase());
@@ -105,7 +111,7 @@ function NasaDataPanel() {
             <li className="row" style={{ padding: '4px 0' }}><I.Folder /> <b>My project</b></li>
             <li className="row" style={{ padding: '4px 0 4px 18px' }}><I.File /> {imported ? `Media: ${media.manifest!.title}` : 'No media imported'}</li>
             <li className="row" style={{ padding: '4px 0 4px 18px' }}><I.File /> {link.state === 'reconstructed' ? 'Measurements: reconstructed climatology' : 'No measurements connected'}</li>
-            <li className="row" style={{ padding: '4px 0 4px 18px' }}><I.File /> Sound mapping: rain-v1</li>
+            <li className="row" style={{ padding: '4px 0 4px 18px' }}><I.File /> Sound mapping: {MAPPING.version} · frame sweep {SCAN.version}</li>
           </ul>
         )}
         <div className="section" style={{ marginTop: 10 }}>
@@ -128,6 +134,37 @@ function NasaDataPanel() {
   );
 }
 
+function PresetNasaPanel() {
+  const media = useStore((s) => s.media);
+  const link = useStore((s) => s.link);
+  const ready = media.state === 'ready' && link.state === 'reconstructed';
+  return (
+    <section className="panel" aria-labelledby="nasa-title">
+      <div className="panel-head"><h2 className="panel-title" id="nasa-title">NASA rainfall animation</h2></div>
+      <div className="panel-body">
+        <div className={`dataset-card ${ready ? '' : 'empty'}`} style={{ marginBottom: 10 }}>
+          <I.Video style={{ marginTop: 2 }} />
+          <div className="grow">
+            <div className="t">IMERG daily climatology</div>
+            <div className="s">NASA SVS 5478 · the average year, 2001–2022</div>
+            <div className="row" style={{ marginTop: 5, flexWrap: 'wrap' }}>
+              <span className={`chip ${ready ? 'accent' : ''}`} style={{ fontSize: 10.5 }}>{ready ? 'READY · LINKED (RECONSTRUCTED)' : media.state === 'ready' ? 'FRAMES LOADED' : 'NOT OPENED'}</span>
+            </div>
+          </div>
+        </div>
+        {!ready && (
+          <button className="btn primary solid big" style={{ width: '100%', marginBottom: 10 }} onClick={() => void quickStartVisual()} disabled={media.state === 'loading' || link.state === 'loading'}>
+            <I.Play /> {media.state === 'loading' || link.state === 'loading' ? 'Opening…' : 'Open NASA rainfall animation'}
+          </button>
+        )}
+        <div className="callout note" style={{ marginBottom: 10 }}><I.Info size={15} style={{ flexShrink: 0 }} /><div className="txt">This animation is an <b>average year</b> (2001–2022), not a particular year. Each frame is one calendar day.</div></div>
+        <ListeningGuide workspace="visual" />
+        <p className="muted" style={{ fontSize: 11.5 }}>Credit: NASA's Scientific Visualization Studio (visualizer Alex Kekesi; science George Huffman, Jackson Tan). <a href="https://svs.gsfc.nasa.gov/5478/" target="_blank" rel="noreferrer">svs.gsfc.nasa.gov/5478</a></p>
+      </div>
+    </section>
+  );
+}
+
 function useStage(aspect: number, fill: boolean) {
   const ref = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
@@ -142,7 +179,7 @@ function useStage(aspect: number, fill: boolean) {
   return { ref, w, h: w / aspect };
 }
 
-function VisualFeed() {
+function VisualFeed({ preset }: { preset: boolean }) {
   const media = useStore((s) => s.media);
   const link = useStore((s) => s.link);
   const visual = useStore((s) => s.visual);
@@ -188,7 +225,7 @@ function VisualFeed() {
           <button aria-pressed={visual.mode === 'timelapse'} onClick={() => setVisual({ mode: 'timelapse' })}>Timelapse</button>
         </div>
         <button className={`btn small ${visual.roi ? 'active' : ''}`} aria-pressed={visual.roi} onClick={() => setVisual({ roi: !visual.roi })} disabled={!media.manifest}><I.Roi /> ROI</button>
-        <select value={visual.fit} onChange={(e) => setVisual({ fit: e.target.value as 'fit' | 'fill' })} aria-label="Image fit"><option value="fit">Fit</option><option value="fill">Fill</option></select>
+        {!preset && <select value={visual.fit} onChange={(e) => setVisual({ fit: e.target.value as 'fit' | 'fill' })} aria-label="Image fit"><option value="fit">Fit</option><option value="fill">Fill</option></select>}
         <button className="btn small" onClick={() => void scanCurrent()} disabled={!scanDoc || !imageOn || media.state !== 'ready'} aria-keyshortcuts="S"><I.Wave size={14} /> Sweep frame</button>
         <button className="btn icon small" onClick={fullscreen} aria-label="Toggle fullscreen"><I.Expand /></button>
       </div>
@@ -200,10 +237,12 @@ function VisualFeed() {
               <div className="roi-box" style={{ left: `${pct(PH_BOX.lonMin, PH_BOX.latMax).x}%`, top: `${pct(PH_BOX.lonMin, PH_BOX.latMax).y}%`, width: `${b.x - a.x}%`, height: `${b.y - a.y}%` }} />
               <span className="roi-tag" style={{ left: `${b.x + 2}%`, top: `${a.y - 12}%`, background: 'var(--panel-2)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>Requested ROI · Philippines</span>
             </div>
-            <div style={{ fontSize: 20, fontWeight: 600 }}>{media.state === 'loading' ? media.message : media.state === 'error' ? 'The NASA visual feed could not be loaded' : 'Import NASA video or frame sequence'}</div>
+            <div style={{ fontSize: 20, fontWeight: 600 }}>{media.state === 'loading' ? media.message : media.state === 'error' ? 'The NASA visual feed could not be loaded' : preset ? 'Watch and hear a year of rain' : 'Import NASA video or frame sequence'}</div>
             {media.state === 'error' && <div className="callout danger"><I.Warn /><div className="txt">{media.message}</div></div>}
             <div className="row">
-              <button className="btn primary" onClick={() => void importVisualFeed()} disabled={media.state === 'loading'}><I.Play /> {media.state === 'error' ? 'Retry import' : 'Import visual feed'}</button>
+              {preset
+                ? <button className="btn primary solid" onClick={() => void quickStartVisual()} disabled={media.state === 'loading'}><I.Play /> Open NASA rainfall animation</button>
+                : <button className="btn primary" onClick={() => void importVisualFeed()} disabled={media.state === 'loading'}><I.Play /> {media.state === 'error' ? 'Retry import' : 'Import visual feed'}</button>}
               <a className="btn" href="https://svs.gsfc.nasa.gov/5478/" target="_blank" rel="noreferrer"><I.External /> Open NASA source</a>
             </div>
             <div className="italic dim">No NASA frame is displayed yet</div>
@@ -364,6 +403,38 @@ function SoundStudio() {
   );
 }
 
+function PresetSoundStudio() {
+  const media = useStore((s) => s.media);
+  const link = useStore((s) => s.link);
+  const linked = link.state === 'reconstructed';
+  return (
+    <section className="panel" aria-labelledby="studio-title">
+      <div className="panel-head"><h2 className="panel-title" id="studio-title">Sound</h2></div>
+      <div className="panel-body">
+        {media.state === 'ready' && !linked && (
+          <div className="callout" style={{ marginBottom: 10 }}>
+            <I.Warn style={{ color: 'var(--amber)', flexShrink: 0 }} />
+            <div><div className="ttl">Sound needs the matching measurements</div>
+              <button className="btn small primary" style={{ marginTop: 6 }} onClick={() => void quickStartVisual()} disabled={link.state === 'loading'}><I.Link /> Connect and play</button></div>
+          </div>
+        )}
+        {linked && (
+          <div className="callout note" style={{ marginBottom: 10 }}>
+            <I.Info style={{ flexShrink: 0 }} /><div><div className="ttl">Reconstructed — approximate</div>
+              <div className="txt">The sound uses daily values rebuilt from monthly NASA measurements (2001–2022), not the exact data behind the frames.</div></div>
+          </div>
+        )}
+        <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>How to listen</div>
+        <ListeningPresetCards workspace="visual" />
+        <MasterVolume />
+        <NarrationToggle />
+        <div style={{ marginBottom: 8 }}><LegendButton /></div>
+        <p className="muted" style={{ fontSize: 11.5 }}>Press <span className="kbd">S</span> to hear the current frame as {SCAN.beats} beats from west to east.</p>
+      </div>
+    </section>
+  );
+}
+
 function ImageFeaturesToggle() {
   const image = useStore((s) => s.image);
   const fs = useStore((s) => s.frameScan);
@@ -393,6 +464,7 @@ function FrameDescribe() {
   const link = useStore((s) => s.link);
   const grid = useMemo(() => currentScanGrid(), [visual.day, doc, imageOn, media.state]); // eslint-disable-line react-hooks/exhaustive-deps
   const meas = useMemo(() => seasonalObservations(), [link.climatology, visual.regionId, media.manifest]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sweepEv = useMemo(() => (grid ? currentScanEvents() : []), [grid]); // eslint-disable-line react-hooks/exhaustive-deps
   if (media.state !== 'ready') return <div className="empty"><I.Info size={28} /><div className="big">Import the visual feed to hear and read each frame</div></div>;
   if (!imageOn) return <div className="empty"><I.Image size={28} /><div>Image features are off. Turn them on in Sound Studio.</div></div>;
   if (!doc || !grid) return <div className="empty"><div>{fsState === 'loading' ? 'Decoding frames…' : 'Frame data unavailable'}</div></div>;
@@ -405,6 +477,7 @@ function FrameDescribe() {
   return (
     <div>
       <p style={{ margin: '0 0 8px', fontSize: 13.5, lineHeight: 1.45 }}>{describeFrame(f, doc.days, meas[visual.day]?.value ?? null)}</p>
+      <p className="dim" style={{ margin: '0 0 8px', fontSize: 12.5, lineHeight: 1.45 }}><b>The frame as music:</b> {describeSweep(sweepEv, SCAN.beats)}</p>
       <div className="row" style={{ marginBottom: 8, flexWrap: 'wrap' }}>
         <button className="btn small primary" onClick={() => void scanCurrent()}><I.Wave size={13} /> Sweep this frame (S)</button>
         <span className="muted" style={{ fontSize: 11.5 }}>Explore: focus the frame, then use the arrow keys (Shift = 5°)</span>
@@ -419,7 +492,7 @@ function FrameDescribe() {
   );
 }
 
-function SeasonalGraph() {
+function SeasonalGraph({ preset }: { preset: boolean }) {
   const link = useStore((s) => s.link);
   const visual = useStore((s) => s.visual);
   const media = useStore((s) => s.media);
@@ -438,7 +511,7 @@ function SeasonalGraph() {
           <button role="tab" style={{ flex: 1 }} aria-selected={tab === 'describe'} onClick={() => setTabState('describe')}>Describe</button>
           <button role="tab" style={{ flex: 1 }} aria-selected={tab === 'rain'} onClick={() => setTabState('rain')}>Rainfall</button>
           <button role="tab" style={{ flex: 1 }} aria-selected={tab === 'band'} onClick={() => setTabState('band')}>Band</button>
-          <button role="tab" style={{ flex: 1 }} aria-selected={tab === 'dist'} onClick={() => setTabState('dist')}>Distrib.</button>
+          {!preset && <button role="tab" style={{ flex: 1 }} aria-selected={tab === 'dist'} onClick={() => setTabState('dist')}>Distrib.</button>}
         </div>
         {tab === 'describe' ? (
           <FrameDescribe />
@@ -462,6 +535,7 @@ function SeasonalGraph() {
             <div className="row"><b>{REGION_NAMES[visual.regionId]} · seasonal mean</b><span className="spacer" /><span className="mono">{cur?.value?.toFixed(3)} mm/hr</span></div>
             <div style={{ flex: 1, minHeight: 0 }}>
               <TimeSeriesGraph points={obs.map((o, i) => ({ key: media.manifest!.frames[i].label, value: o.value }))} cursor={visual.day} onSelect={(i) => seek(i)}
+                reference={seasonalContexts(obs.map((o) => o.value)).map((c) => c.normal)} referenceLabel="yearly average"
                 yLabel="mm/hr" ticks={ticks} describe={`Reconstructed seasonal mean rainfall for ${REGION_NAMES[visual.regionId]}. Current day ${media.manifest!.frames[visual.day]?.label}: ${cur?.value?.toFixed(3)} mm/hr.`} />
             </div>
           </>

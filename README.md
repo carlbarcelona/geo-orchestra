@@ -16,17 +16,28 @@ Every sound event records its date, its location or aggregation, the original va
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 22 checks of the risky transformations
+npm test           # 74 checks of the risky transformations
 npm run build && npm run preview
 ```
 
 The prepared data is static under `public/data/`, so no backend or live NASA connection is needed at runtime.
 
+## Preset and Advanced mode
+
+A **Preset | Advanced** switch sits at the right of the Numerical | Visual feed bar. The choice is remembered in the browser and saved in project files.
+
+- **Preset** (the default for first-time visitors) shows the essentials:
+  - Numerical: a **Start listening** button (loads the NASA sample, selects the Philippines, plays from Jun 2000), region buttons, three listening presets, a "What you hear" guide, the graph with its normal line, and a "Now hearing" caption.
+  - Visual feed: one **Open NASA rainfall animation** button imports the frames, connects the climatology and plays.
+- **Advanced** is the full interface: instruments, scales, pitch range, every mapping and layer, metadata, coordinates, alignment evidence.
+
+Switching only changes which controls are shown, never the data or playback. The honesty labels (reconstructed linkage, seasonal average, image-derived) are shown in both modes.
+
 ## Using it (demo path)
 
 1. **Numerical → NASA sample.** This loads 295 months. The Philippines land area is selected by default and shown as an area mean.
 2. Use **Table / Map / Graph**. Selecting a time anywhere moves the shared cursor in every view. Clicking a map cell pins a single 0.1° cell.
-3. Press **Space** to play Musical sonification, switch to **Geophony**, then click a note and open **Event details**.
+3. Press **Space** to play Musical sonification. A soft hum plays the normal for that month (2001–2022), so a melody above the hum means wetter, below drier; a bell marks unusual months. Switch to **Geophony**, then click a note and open **Event details**.
 4. Use **Audio legend** to audition low, middle, high, zero and missing cases.
 5. In the **Visual feed**:
    1. **Import visual feed**. The authentic SVS frames appear, but audio and graphs stay disabled.
@@ -34,7 +45,7 @@ The prepared data is static under `public/data/`, so no backend or live NASA con
    3. Play, toggle **ROI**, and open **Frame alignment** to see the evidence.
 
 6. **Hear what a frame shows.**
-   - Press **S** (or **Sweep frame**) to sweep the frame west → east, as NASA's Hubble sonifications do: north is higher pitch, more rain is louder.
+   - Press **S** (or **Sweep frame**) to play the frame as 11 beats from west to east: pitch = latitude (one fixed table), loudness = rain class, silence = dry.
    - Focus the frame and use the arrow keys to explore it cell by cell.
    - The **Describe** tab explains the frame in words and shows **braille charts** for refreshable braille displays.
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { INSTRUMENTS, type InstrumentId } from '../../sound/engine';
-import { midiToName, SCALES } from '../../sound/mapping';
+import { NORMAL } from '../../sound/context';
+import { MAPPING, midiToName, scaleNotes, SCALES, stepSize } from '../../sound/mapping';
 import { updateSound } from '../../state/actions';
 import { set, useStore } from '../../state/store';
 import * as I from '../icons';
@@ -44,6 +45,9 @@ export function PitchRange() {
   return (
     <div style={{ marginBottom: 10 }}>
       <div className="row"><span className="dim">Pitch range</span><span className="spacer" /><span className="mono">{midiToName(s.pitchLow)} – {midiToName(s.pitchHigh)}</span></div>
+      <div className="muted" style={{ fontSize: 11.5 }}>
+        {(() => { const n = scaleNotes(s.scale, s.pitchLow, s.pitchHigh).length; return `${n} notes · one step ≈ ${stepSize('area', n).toFixed(3)} mm/hr (area mean) or ${stepSize('cell', n).toFixed(3)} mm/hr (cell)`; })()}
+      </div>
       <div className="row">
         <input type="range" min={36} max={72} step={1} value={s.pitchLow} aria-label={`Lowest note ${midiToName(s.pitchLow)}`}
           onChange={(e) => updateSound({ pitchLow: Math.min(Number(e.target.value), s.pitchHigh - 12) })} />
@@ -73,7 +77,7 @@ export function LayerLevels() {
       <span className="mono">{layers[k].toFixed(2)}</span>
     </div>
   );
-  return <>{row('melody', 'Melody layer')}{row('texture', 'Rain texture')}{row('markers', 'Markers')}{row('image', 'Frame sweep & band')}</>;
+  return <>{row('melody', 'Melody layer')}{row('context', 'Normal & cues')}{row('texture', 'Rain texture')}{row('markers', 'Markers')}{row('image', 'Frame sweep & band')}</>;
 }
 
 export function MappingRows({ compact }: { compact?: boolean }) {
@@ -84,7 +88,28 @@ export function MappingRows({ compact }: { compact?: boolean }) {
         <I.Rain /><span>Rainfall</span><span>→</span><select value="pitch" disabled aria-label="Rainfall maps to"><option value="pitch">Pitch &amp; velocity</option></select>
       </div>
       <div className="field" style={{ gridTemplateColumns: '20px 1fr 20px 1.2fr' }}>
-        <I.Wave /><span>Variation</span><span>→</span><select value="density" disabled aria-label="Variation maps to"><option value="density">Note density</option></select>
+        <I.Chart /><span>Normal ({NORMAL.baseline[0]}–{String(NORMAL.baseline[1]).slice(2)})</span><span>→</span>
+        <select value={s.reference ? 'hum' : 'off'} onChange={(e) => updateSound({ reference: e.target.value === 'hum' })} aria-label="Normal maps to">
+          <option value="hum">Hum (reference pitch)</option><option value="off">Off</option>
+        </select>
+      </div>
+      <div className="field" style={{ gridTemplateColumns: '20px 1fr 20px 1.2fr' }}>
+        <I.Note /><span>Wetter / drier</span><span>→</span>
+        <select value={s.harmony ? 'chord' : 'off'} onChange={(e) => updateSound({ harmony: e.target.value === 'chord' })} aria-label="Wetter or drier than normal maps to">
+          <option value="chord">Major / minor chord</option><option value="off">Off</option>
+        </select>
+      </div>
+      <div className="field" style={{ gridTemplateColumns: '20px 1fr 20px 1.2fr' }}>
+        <I.Warn /><span>Unusual months</span><span>→</span>
+        <select value={s.cues ? 'cues' : 'off'} onChange={(e) => updateSound({ cues: e.target.value === 'cues' })} aria-label="Unusual months map to">
+          <option value="cues">Bell · thunder · dry wind</option><option value="off">Off</option>
+        </select>
+      </div>
+      <div className="field" style={{ gridTemplateColumns: '20px 1fr 20px 1.2fr' }}>
+        <I.Wave /><span>Variation</span><span>→</span>
+        <select value={s.variation ? 'density' : 'off'} onChange={(e) => updateSound({ variation: e.target.value === 'density' })} aria-label="Variation maps to">
+          <option value="density">Note density</option><option value="off">Off</option>
+        </select>
       </div>
       <div className="field" style={{ gridTemplateColumns: '20px 1fr 20px 1.2fr' }}>
         <I.Arrows /><span>Longitude</span><span>→</span>
@@ -92,7 +117,7 @@ export function MappingRows({ compact }: { compact?: boolean }) {
           <option value="stereo">Stereo (5 sampled cells)</option><option value="off">Off</option>
         </select>
       </div>
-      <p className="muted" style={{ fontSize: 11.5, margin: '0 0 6px' }}>Mappings are fixed across dates and regions (version rain-v1). Changing instrument or scale never changes the measurements.</p>
+      <p className="muted" style={{ fontSize: 11.5, margin: '0 0 6px' }}>Mappings are fixed across dates and regions (version {MAPPING.version}: linear pitch, area means 0–{MAPPING.ranges.area[1]} and cells 0–{MAPPING.ranges.cell[1]} mm/hr). Changing instrument or scale never changes the measurements.</p>
     </div>
   );
 }

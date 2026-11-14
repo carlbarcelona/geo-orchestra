@@ -1,14 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { formatValue, monthLabel } from '../../data/dataset';
 import { currentObservations, scanCurrent, seek, selectCell, setView } from '../../state/actions';
 import { useStore } from '../../state/store';
 import * as I from '../icons';
 import { RegionMap } from '../shared/RegionMap';
 import { TimeSeriesGraph } from '../shared/TimeSeriesGraph';
+import { monthlyContexts, NORMAL } from '../../sound/context';
 
 type YVar = 'precipitation' | 'randomError' | 'coverage';
 
-export function DatasetPanel() {
+/** `simple` (Preset mode): Graph/Map/Table only, no metadata, column, filter, axis or coordinate controls. */
+export function DatasetPanel({ simple = false }: { simple?: boolean }) {
   const ds = useStore((s) => s.dataset);
   const view = useStore((s) => s.view);
   const selection = useStore((s) => s.selection);
@@ -22,6 +24,10 @@ export function DatasetPanel() {
   const [showCols, setShowCols] = useState(false);
   const [yVar, setYVar] = useState<YVar>('precipitation');
   const [kind, setKind] = useState<'line' | 'bars'>('line');
+  const [showNormal, setShowNormal] = useState(true);
+  useEffect(() => { if (simple) setYVar('precipitation'); }, [simple]);
+  const normals = useMemo(() => monthlyContexts(obs).map((c) => c.normal), [obs]);
+  const hasNormal = normals.some((v) => v != null);
 
   const rows = useMemo(() => obs.map((o, i) => ({ o, i })).filter(({ o }) => {
     if (filter !== 'all' && o.quality !== filter) return false;
@@ -44,11 +50,11 @@ export function DatasetPanel() {
     <div className="panel-head">
       <h2 className="panel-title" id="dataset-title"><I.Grid size={18} /> Numerical dataset</h2>
       <div className="tabs-inline" role="tablist" aria-label="Dataset view" style={{ marginLeft: 'auto' }}>
-        {(['table', 'map', 'graph'] as const).map((v) => (
+        {(simple ? (['graph', 'map', 'table'] as const) : (['table', 'map', 'graph'] as const)).map((v) => (
           <button key={v} role="tab" className="tab-inline" aria-selected={view === v} onClick={() => setView(v)}>{v[0].toUpperCase() + v.slice(1)}</button>
         ))}
       </div>
-      <button className={`btn small ${view === 'metadata' ? 'active' : ''}`} onClick={() => setView('metadata')} aria-pressed={view === 'metadata'}><I.Info /> Metadata</button>
+      {!simple && <button className={`btn small ${view === 'metadata' ? 'active' : ''}`} onClick={() => setView('metadata')} aria-pressed={view === 'metadata'}><I.Info /> Metadata</button>}
     </div>
   );
 
@@ -77,7 +83,7 @@ export function DatasetPanel() {
             <label className="row grow" style={{ border: '1px solid var(--line-2)', borderRadius: 6, padding: '0 8px', background: 'var(--panel-2)' }}>
               <I.Search /><input type="search" placeholder="Search records (e.g. 2010, jul, missing)" value={query} onChange={(e) => setQuery(e.target.value)} style={{ border: 'none', background: 'transparent', flex: 1 }} aria-label="Search records" />
             </label>
-            <label className="row"><I.Filter /><span className="sr-only">Filter by availability</span>
+            {!simple && <><label className="row"><I.Filter /><span className="sr-only">Filter by availability</span>
               <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Filter by availability">
                 <option value="all">All availability</option><option value="valid">Valid</option><option value="partial">Partial</option><option value="missing">Missing</option>
               </select>
@@ -90,7 +96,7 @@ export function DatasetPanel() {
                   <label className="row"><input type="checkbox" checked={cols.coverage} onChange={(e) => setCols({ ...cols, coverage: e.target.checked })} /> Valid coverage</label>
                 </div>
               )}
-            </div>
+            </div></>}
           </div>
           <div className="table-wrap">
             <table className="data">
@@ -100,8 +106,8 @@ export function DatasetPanel() {
                 <th>lat<span className="u">Latitude · °N</span></th>
                 <th>lon<span className="u">Longitude · °E</span></th>
                 <th>precipitation<span className="u">{selection?.type === 'area' ? 'Area mean' : 'Cell'} rate · mm/hr</span></th>
-                {cols.error && <th>random error<span className="u">RMS · mm/hr</span></th>}
-                {cols.coverage && <th>coverage<span className="u">valid cells</span></th>}
+                {cols.error && !simple && <th>random error<span className="u">RMS · mm/hr</span></th>}
+                {cols.coverage && !simple && <th>coverage<span className="u">valid cells</span></th>}
                 <th>availability<span className="u">App status</span></th>
               </tr></thead>
               <tbody>
@@ -112,8 +118,8 @@ export function DatasetPanel() {
                     <td>{o.lat?.toFixed(2) ?? '—'}</td>
                     <td>{o.lon?.toFixed(2) ?? '—'}</td>
                     <td>{o.value == null ? 'missing' : o.value.toFixed(4)}</td>
-                    {cols.error && <td>{formatValue(o.randomError, 4)}</td>}
-                    {cols.coverage && <td>{o.coverage != null ? `${(o.coverage * 100).toFixed(1)}% (${o.validCells})` : o.selectionType === 'cell' ? '1 cell' : '—'}</td>}
+                    {cols.error && !simple && <td>{formatValue(o.randomError, 4)}</td>}
+                    {cols.coverage && !simple && <td>{o.coverage != null ? `${(o.coverage * 100).toFixed(1)}% (${o.validCells})` : o.selectionType === 'cell' ? '1 cell' : '—'}</td>}
                     <td><span className={`badge ${o.quality}`}>{o.quality}</span></td>
                   </tr>
                 ))}
@@ -127,11 +133,15 @@ export function DatasetPanel() {
         <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {ds.grid ? (
             <>
-              <div className="row" style={{ flexWrap: 'wrap' }}>
-                <CellPicker />
-                <span className="spacer" />
-                <button className="btn small primary" onClick={() => void scanCurrent()} aria-keyshortcuts="S"><I.Wave size={13} /> Sweep this month (S)</button>
-              </div>
+              {simple ? (
+                <div className="muted" style={{ fontSize: 12 }}>Click a map cell to listen to that single place; choose a region on the left to go back to an area.</div>
+              ) : (
+                <div className="row" style={{ flexWrap: 'wrap' }}>
+                  <CellPicker />
+                  <span className="spacer" />
+                  <button className="btn small primary" onClick={() => void scanCurrent()} aria-keyshortcuts="S"><I.Wave size={13} /> Sweep this month (S)</button>
+                </div>
+              )}
               <RegionMap dataset={ds} monthIndex={cursor} selection={selection} onSelectCell={selectCell} />
             </>
           ) : <div className="empty"><I.Pin size={30} /><div className="big">Map requires gridded coordinates</div><div className="italic">Imported point files are listed in Table and Graph.</div></div>}
@@ -139,6 +149,13 @@ export function DatasetPanel() {
       )}
       {view === 'graph' && (
         <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {simple ? (
+            <div className="row" style={{ flexWrap: 'wrap' }}>
+              <b>{selection?.label?.split(' (')[0]} · rainfall each month</b>
+              <span className="spacer" />
+              <span className="muted" style={{ fontSize: 12 }}>{hasNormal ? `Dashed line = normal for that month (${NORMAL.baseline[0]}–${NORMAL.baseline[1]} average). Click the graph to jump there.` : 'Click the graph to jump to a month.'}</span>
+            </div>
+          ) : (
           <div className="row" style={{ flexWrap: 'wrap' }}>
             <span className="chip">X: time (UTC, month)</span>
             <label className="row"><span className="muted">Y</span>
@@ -152,13 +169,16 @@ export function DatasetPanel() {
               <button aria-pressed={kind === 'line'} onClick={() => setKind('line')}>Line</button>
               <button aria-pressed={kind === 'bars'} onClick={() => setKind('bars')}>Bars</button>
             </div>
+            {hasNormal && yVar === 'precipitation' && <label className="row" style={{ fontSize: 12.5 }}><input type="checkbox" checked={showNormal} onChange={(e) => setShowNormal(e.target.checked)} /> Normal ({NORMAL.baseline[0]}–{NORMAL.baseline[1]})</label>}
             <span className="spacer" />
             <span className="muted">{selection?.label} · {selection?.type === 'area' ? 'area mean' : 'single cell'}</span>
           </div>
+          )}
           <div style={{ flex: 1, minHeight: 0 }}>
             <TimeSeriesGraph
               points={obs.map((o) => ({ key: o.t, value: yVar === 'precipitation' ? o.value : yVar === 'randomError' ? o.randomError ?? null : o.coverage ?? null }))}
-              cursor={cursor} range={range} onSelect={seek} kind={kind}
+              cursor={cursor} range={range} onSelect={seek} kind={simple ? 'line' : kind}
+              reference={yVar === 'precipitation' && hasNormal && (simple || showNormal) ? normals : undefined} referenceLabel={`normal (${NORMAL.baseline[0]}–${NORMAL.baseline[1]})`}
               yLabel={yVar === 'coverage' ? 'Valid coverage' : yVar === 'randomError' ? 'Random error (mm/hr)' : 'Precipitation rate (mm/hr)'}
               ticks={ticks} yMax={yVar === 'coverage' ? 1 : undefined}
               describe={`${yVar} for ${selection?.label}, ${ds.months[0]} to ${ds.months[ds.months.length - 1]}. Cursor at ${cur?.t}: ${cur?.value == null ? 'missing' : cur.value.toFixed(3) + ' mm/hr'}.`}

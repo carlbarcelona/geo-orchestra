@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { controller } from '../../playback/controller';
+import { speechAvailable, stopSpeaking } from '../../a11y/speech';
+import { NORMAL } from '../../sound/context';
 import { MAPPING } from '../../sound/mapping';
-import { audition, openProject, saveProject, scanCurrent, setTab, stepBy, togglePlay, toggleLoop } from '../../state/actions';
+import { SCAN } from '../../sound/frameScan';
+import { audition, openProject, saveProject, scanCurrent, setTab, setUiMode, stepBy, togglePlay, toggleLoop, type LegendKind } from '../../state/actions';
 import { set, useStore } from '../../state/store';
 import * as I from '../icons';
 
@@ -62,7 +65,27 @@ export function SubBar() {
           {media.state === 'ready' && <span className={`chip ${link.state === 'reconstructed' ? 'amber' : ''}`}>{link.state === 'reconstructed' ? 'Linkage: reconstructed (approximate)' : 'Linkage: not connected'}</span>}
         </>
       )}
+      <span className="spacer" />
+      <ModeSwitch />
     </nav>
+  );
+}
+
+/** Preset | Advanced. Only changes which controls are shown — never the data, the sound mapping or playback. */
+export function ModeSwitch() {
+  const mode = useStore((s) => s.uiMode);
+  return (
+    <div className="mode-switch" role="group" aria-label="Interface mode">
+      <span className="mode-switch-label hide-sm" aria-hidden="true">Mode</span>
+      <div className="seg">
+        <button aria-pressed={mode === 'preset'} onClick={() => setUiMode('preset')} title="Preset: the essentials and recommended listening settings, for first-time and non-technical users">
+          <I.Play size={12} /> Preset
+        </button>
+        <button aria-pressed={mode === 'advanced'} onClick={() => setUiMode('advanced')} title="Advanced: every configuration control (instruments, scales, mappings, layers, alignment evidence)">
+          <I.Layers size={13} /> Advanced
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -112,6 +135,19 @@ export function useShortcuts() {
   }, []);
 }
 
+function LegendRows({ rows }: { rows: [LegendKind, string, string][] }) {
+  return (
+    <>
+      {rows.map(([k, label, desc]) => (
+        <div className="legend-row" key={k}>
+          <b>{label}</b><span className="dim" style={{ fontSize: 12.5 }}>{desc}</span>
+          <button className="btn small primary" onClick={() => void audition(k)} aria-label={`Play legend example: ${label}`}><I.Play size={13} /> Play</button>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -152,6 +188,7 @@ export function Dialogs() {
               <option value={0}>never</option><option value={7}>7 days</option><option value={15}>15 days</option><option value={30}>30 days</option>
             </select></label>
           <label className="row" style={{ padding: '6px 0' }}><input type="checkbox" checked={a11y.haptics} onChange={(e) => setA({ haptics: e.target.checked })} /> Vibrate with rain intensity while exploring (Android browsers; not supported on iPhone)</label>
+          <label className="row" style={{ padding: '6px 0' }}><input type="checkbox" checked={a11y.speak} disabled={!speechAvailable()} onChange={(e) => { setA({ speak: e.target.checked }); if (!e.target.checked) stopSpeaking(); }} /> Speak summaries aloud (browser voice): on pause and step, and for unusual months during playback{!speechAvailable() && ' — not available in this browser'}</label>
           <p style={{ marginTop: 10 }}>Screen readers hear actions and status changes (play, pause, buffering, dataset loaded, selection) but not every frame during playback. The map has a keyboard alternative: the region selector and the coordinate picker in Map view.</p>
           <p>Accessibility checks performed: keyboard-only walkthrough, focus visibility, contrast of text tokens, labelled controls. Not yet validated with blind or low-vision participants.</p>
         </Dialog>
@@ -159,18 +196,29 @@ export function Dialogs() {
       {d.legend && (
         <Dialog title="Audio legend" onClose={close('legend')}>
           <p>Playback pauses while you audition. Current mode: <b>{mode === 'musical' ? 'Musical sonification' : 'Geophony'}</b>. These examples use the same fixed mapping ({MAPPING.version}) as playback.</p>
-          {([
+          <h3 className="legend-h">1 · How much rain? (the piano)</h3>
+          <LegendRows rows={[
             ['low', 'Low rainfall', '0.05 mm/hr → low, soft note · sparse drops'],
             ['middle', 'Middle', '0.40 mm/hr → middle register · steady rain'],
-            ['high', 'High rainfall', '1.20 mm/hr → high, loud note · dense rain'],
+            ['high', 'High rainfall', '0.75 mm/hr → high, loud note · dense rain'],
             ['zero', 'Zero (measured)', '0 mm/hr → lowest note plus a bright “zero” tick'],
-            ['missing', 'Missing', 'No measurement → no note, a muted thud, rain fades out'],
-          ] as const).map(([k, label, desc]) => (
-            <div className="legend-row" key={k}>
-              <b>{label}</b><span className="dim" style={{ fontSize: 12.5 }}>{desc}</span>
-              <button className="btn small primary" onClick={() => void audition(k)} aria-label={`Play legend example: ${label}`}><I.Play size={13} /> Play</button>
-            </div>
-          ))}
+            ['missing', 'Missing', 'No measurement → no note, a muted thud; the hum still plays the normal'],
+          ]} />
+          <h3 className="legend-h">2 · Compared with normal (the hum and the chord)</h3>
+          <p className="dim" style={{ fontSize: 12.5 }}>Examples for a July whose normal ({NORMAL.baseline[0]}–{NORMAL.baseline[1]}) is 0.35 mm/hr. Turn on “Normal hum”, “Harmony” and “Cues” in Advanced to hear every part.</p>
+          <LegendRows rows={[
+            ['near-normal', 'Near normal', 'melody on the hum · open fifth (neutral)'],
+            ['wetter', 'Wetter', 'melody above the hum · bright major chord'],
+            ['much-wetter', 'Much wetter', 'far above · full bright chord · thunder in Geophony'],
+            ['drier', 'Drier', 'melody below the hum · dark minor chord'],
+            ['much-drier', 'Much drier', 'far below · full dark chord · dry wind in Geophony'],
+            ['unusual', 'Unusual month', `more than ${NORMAL.zExtreme} standard deviations from normal → a bell`],
+          ]} />
+          <h3 className="legend-h">3 · Where is the rain? (frame sweep, bells and the string glide)</h3>
+          <p className="dim" style={{ fontSize: 12.5, margin: '0 0 6px' }}>
+            Pitch = <b>latitude</b> (each note is a 2.5° band: C4 ≈ 2.5–5°N, the Philippines is about D4–D5) · loudness = <b>rain class</b> (light, moderate, heavy, very heavy) ·
+            silence = <b>dry</b> · a sweep is <b>{SCAN.beats} beats from west to east</b>, with a soft tick on the beats over the Philippine sector. Press <span className="kbd">S</span> to hear the current frame.
+          </p>
           <p style={{ marginTop: 10 }}>Sounds are designed mappings of satellite estimates, not recordings. Instrument and volume change the timbre and loudness only, never the underlying values.</p>
         </Dialog>
       )}

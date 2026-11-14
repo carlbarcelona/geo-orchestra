@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { NORMAL } from '../../sound/context';
 import { MAPPING } from '../../sound/mapping';
 import { importProcessedFile, loadNasa, loadSynthetic, removeDataset, removePin, select, selectRegion } from '../../state/actions';
 import { useStore } from '../../state/store';
@@ -111,10 +112,12 @@ export function ProjectPanel() {
           <div className="section"><div className="section-body" style={{ fontSize: 12.5 }}>
             <dl className="kv" style={{ gridTemplateColumns: '120px 1fr' }}>
               <dt>Mapping version</dt><dd>{MAPPING.version}</dd>
-              <dt>Rainfall</dt><dd style={{ fontFamily: 'var(--font)' }}>→ pitch &amp; velocity (sqrt over fixed 0–{MAPPING.referenceRange[1]} mm/hr; above is clipped and flagged)</dd>
-              <dt>Change</dt><dd style={{ fontFamily: 'var(--font)' }}>→ note density (+1 note per {MAPPING.densityStep} mm/hr, max {MAPPING.maxNotesPerStep}); no change is computed across a gap</dd>
+              <dt>Rainfall</dt><dd style={{ fontFamily: 'var(--font)' }}>→ pitch &amp; velocity, linear on a fixed range: area means 0–{MAPPING.ranges.area[1]}, single cells 0–{MAPPING.ranges.cell[1]} mm/hr (above is clipped and flagged)</dd>
+              <dt>Normal (hum)</dt><dd style={{ fontFamily: 'var(--font)' }}>a soft hum plays the {NORMAL.baseline[0]}–{NORMAL.baseline[1]} mean of the same calendar month; melody above = wetter, below = drier</dd>
+              <dt>Harmony</dt><dd style={{ fontFamily: 'var(--font)' }}>major chord = wetter, minor = drier, open fifth = near normal (±{NORMAL.zNear} SD); a bell marks |z| ≥ {NORMAL.zExtreme}</dd>
+              <dt>Change</dt><dd style={{ fontFamily: 'var(--font)' }}>→ optional note density (+1 note per {MAPPING.densityStep} mm/hr, max {MAPPING.maxNotesPerStep}; off by default); never computed across a gap</dd>
               <dt>Longitude</dt><dd style={{ fontFamily: 'var(--font)' }}>→ stereo pan of the 5 sampled cells (spatial phrases)</dd>
-              <dt>Geophony</dt><dd style={{ fontFamily: 'var(--font)' }}>rainfall → drop density, rain-bed intensity and brightness</dd>
+              <dt>Geophony</dt><dd style={{ fontFamily: 'var(--font)' }}>rainfall → drop density, rain-bed intensity and brightness; thunder = much wetter, dry wind = much drier than normal</dd>
               <dt>Missing</dt><dd style={{ fontFamily: 'var(--font)' }}>no note, a muted thud and a red gap — never zero</dd>
               <dt>Zero</dt><dd style={{ fontFamily: 'var(--font)' }}>lowest note plus a bright “zero” tick</dd>
             </dl>

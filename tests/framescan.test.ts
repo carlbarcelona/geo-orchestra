@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { brailleBars, braillePointer, column, describeCell, describeFrame, resample } from '../src/a11y/braille';
+import { brailleBars, braillePointer, column, describeCell, describeFrame, describeSweep, resample } from '../src/a11y/braille';
 import type { FrameFeature, FrameScanDoc } from '../src/contracts';
-import { columnProfile, featureEvents, frameGrid, scanEvents, type ScanGrid } from '../src/sound/frameScan';
+import { analyzeBeats, cellEvent, columnProfile, featureEvents, frameGrid, latitudeBands, latitudeNote, SCAN, scanEvents, type ScanGrid } from '../src/sound/frameScan';
+import { intensityClass, INTENSITY } from '../src/sound/intensity';
+import { scaleNotes } from '../src/sound/mapping';
 
 const opts = { scale: 'C pentatonic', pitchLow: 48, pitchHigh: 84, stepIndex: 0, t: 'D001', label: 'Jan 01', datasetId: 'test', selectionId: 'frame' };
 function grid(vals: (number | null)[][], refMax = 24): ScanGrid {
@@ -118,5 +120,68 @@ describe('features and descriptions', () => {
   it('cell description handles unknown cells', () => {
     expect(describeCell(10, 120, null, 'mm/day', 'image-derived')).toMatch(/no value/);
     expect(describeCell(-5, 120, 9, 'mm/day', 'image-derived')).toMatch(/5\.0°S.*heavy/);
+  });
+});
+
+describe('scan-v2: one learnable rule', () => {
+  const notes = scaleNotes('C pentatonic', 48, 84);
+  it('one latitude table: 16 notes on 2.5° bands, south lowest, C4 at 2.5–5°N', () => {
+    const bands = latitudeBands(notes);
+    expect(bands).toHaveLength(16);
+    expect(bands[0]).toMatchObject({ lo: -10, hi: -7.5, midi: 48 });
+    expect(bands.every((b, i) => i === 0 || b.midi > bands[i - 1].midi)).toBe(true);
+    expect(latitudeNote(3, notes).midi).toBe(60);     // C4
+    expect(latitudeNote(29.9, notes).midi).toBe(84);  // C6
+    expect(latitudeNote(14.6, notes).midi).toBe(69);  // Manila → A4
+  });
+  it('rain classes match the description words', () => {
+    expect([1.9, 2, 5, 8, 14].map(intensityClass)).toEqual(['dry', 'light', 'moderate', 'heavy', 'very heavy']);
+    expect(INTENSITY.velocity.heavy).toBeGreaterThan(INTENSITY.velocity.light);
+  });
+  const g = frameGrid(doc, bytes, 196); // Jul 15
+  const ev = scanEvents(g, opts);
+  const scan = ev.filter((e) => e.kind === 'scan');
+  it('a frame is 11 beats, at most 2 notes each, west → east', () => {
+    expect(analyzeBeats(g, opts)).toHaveLength(SCAN.beats);
+    const perBeat = new Map<number, number>();
+    scan.forEach((e) => perBeat.set(e.scan!.beat!, (perBeat.get(e.scan!.beat!) ?? 0) + 1));
+    expect(Math.max(...perBeat.values())).toBeLessThanOrEqual(SCAN.notesPerBeat);
+    expect(scan.length).toBeLessThanOrEqual(SCAN.beats * SCAN.notesPerBeat);
+    const offs = scan.map((e) => e.offset);
+    expect(offs).toEqual([...offs].sort((a, b) => a - b));
+  });
+  it('pitch is the latitude band, loudness the rain class', () => {
+    for (const e of scan) {
+      expect(e.midi).toBe(latitudeNote(e.scan!.lat, notes).midi);
+      expect(e.velocity).toBe(INTENSITY.velocity[e.scan!.intensity as keyof typeof INTENSITY.velocity]);
+      expect(e.scan!.intensity).not.toBe('dry');
+    }
+  });
+  it('a dry beat is a rest', () => {
+    const dry = grid([[0, 0, 0, 0], [0, 10, 0, 0]]);
+    const e = scanEvents(dry, { ...opts, beats: 4 }).filter((x) => x.kind === 'scan');
+    expect(e.map((x) => x.scan!.beat)).toEqual([1]);
+  });
+  it('beats over the Philippine sector get a soft tick', () => {
+    const ticks = ev.filter((e) => e.marker === 'region').map((e) => e.scan!.beat);
+    expect(ticks.length).toBeGreaterThanOrEqual(3);
+    for (const b of ticks) {
+      const [w, e] = analyzeBeats(g, opts)[b!].lon;
+      expect(e > SCAN.region.lonMin && w < SCAN.region.lonMax).toBe(true);
+    }
+  });
+  it('the sweep, the band voice and the cursor give the same note for the same latitude', () => {
+    const day = doc.days[196];
+    const band = featureEvents(doc.days, opts)[196].find((e) => e.kind === 'feature')!;
+    expect(band.midi).toBe(latitudeNote(day.bandLat!, notes).midi);
+    const r = Math.floor((day.bandLat! - g.latMin) / g.step), c = 25;
+    const cur = cellEvent(g, r, c, opts);
+    if (cur) expect(cur.midi).toBe(latitudeNote(g.latMin + (r + 0.5) * g.step, notes).midi);
+  });
+  it('describes the sweep in words', () => {
+    const t = describeSweep(ev, SCAN.beats);
+    expect(t).toMatch(/11 beats from west to east/);
+    expect(t).toMatch(/Philippine sector/);
+    expect(describeSweep([], 11)).toMatch(/All 11 beats are silent/);
   });
 });

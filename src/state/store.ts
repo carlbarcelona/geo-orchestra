@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import type { AlignmentEvidence, ClimatologyLinkage, FrameScanDoc, Selection, SoundEvent, VisualMediaManifest } from '../contracts';
 import type { Dataset } from '../data/dataset';
 import type { InstrumentId, LayerLevels, SoundMode } from '../sound/engine';
+import { DEFAULT_PRESET, type ListeningPresetId } from '../sound/presets';
 
 export type Tab = 'numerical' | 'visual';
+export type UiMode = 'preset' | 'advanced';
 export type DataView = 'table' | 'map' | 'graph' | 'metadata';
 export type LoadState = 'empty' | 'loading' | 'ready' | 'error';
 export type MediaState = 'none' | 'loading' | 'error' | 'ready';
@@ -19,12 +21,21 @@ export interface SoundSettings {
   layers: LayerLevels;
   spatialPhrases: boolean;
   preset: 'rain-pitch' | 'rain-pitch-spatial';
+  /** rain-v2 context layers */
+  reference: boolean;   // the normal "hum"
+  harmony: boolean;     // wetter/drier chord
+  cues: boolean;        // unusual-month bell, thunder, dry wind
+  variation: boolean;   // change → extra notes
 }
 
-export interface A11ySettings { reducedMotion: boolean; highContrast: boolean; largeText: boolean; announceSteps: boolean; brailleCharts: boolean; describeEvery: number; haptics: boolean }
+export interface A11ySettings { reducedMotion: boolean; highContrast: boolean; largeText: boolean; announceSteps: boolean; brailleCharts: boolean; describeEvery: number; haptics: boolean; speak: boolean }
 
 export interface AppState {
   tab: Tab;
+  /** Preset = simplified first-run interface; Advanced = every control. Only changes what is shown. */
+  uiMode: UiMode;
+  /** The listening preset chosen in Preset mode, per workspace. */
+  listening: Record<Tab, ListeningPresetId>;
   view: DataView;
   dataset: Dataset | null;
   load: { state: LoadState; progress: number; message: string; errors: string[]; warnings: string[]; source?: 'nasa' | 'synthetic' | 'file' };
@@ -59,12 +70,24 @@ export interface AppState {
 
 export const DEFAULT_SOUND: SoundSettings = {
   mode: 'musical', instrument: 'soft-piano', scale: 'C pentatonic', pitchLow: 48, pitchHigh: 84, master: 0.8,
-  layers: { melody: 0.8, texture: 0.75, markers: 0.5, image: 0.7 }, spatialPhrases: false, preset: 'rain-pitch',
+  layers: { melody: 0.8, texture: 0.75, markers: 0.5, image: 0.7, context: 0.55 }, spatialPhrases: false, preset: 'rain-pitch',
+  reference: true, harmony: true, cues: true, variation: false,
 };
+
+export const UI_MODE_KEY = 'geoorchestra:uiMode';
+/** Remembered per browser; any storage failure (private mode, blocked storage) falls back to Preset. */
+export function readUiMode(): UiMode {
+  try { return globalThis.localStorage?.getItem(UI_MODE_KEY) === 'advanced' ? 'advanced' : 'preset'; } catch { return 'preset'; }
+}
+export function writeUiMode(m: UiMode) {
+  try { globalThis.localStorage?.setItem(UI_MODE_KEY, m); } catch { /* storage unavailable */ }
+}
 
 export const useStore = create<AppState>(() => ({
   tab: 'numerical',
-  view: 'table',
+  uiMode: readUiMode(),
+  listening: { ...DEFAULT_PRESET },
+  view: readUiMode() === 'preset' ? 'graph' : 'table',
   dataset: null,
   load: { state: 'empty', progress: 0, message: '', errors: [], warnings: [] },
   selection: null,
@@ -86,7 +109,7 @@ export const useStore = create<AppState>(() => ({
   media: { state: 'none', message: '', manifest: null, alignment: null },
   link: { state: 'none', message: '', climatology: null },
   visual: { day: 0, mode: 'timelapse', roi: false, fit: 'fit', regionId: 'philippines', speed: 10, fullscreen: false },
-  a11y: { reducedMotion: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches, highContrast: false, largeText: false, announceSteps: false, brailleCharts: true, describeEvery: 15, haptics: true },
+  a11y: { reducedMotion: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches, highContrast: false, largeText: false, announceSteps: false, brailleCharts: true, describeEvery: 15, haptics: true, speak: false },
   dialogs: { a11y: false, legend: false, sources: false, shortcuts: false },
   announcement: { text: '', id: 0 },
   eventsCache: null,

@@ -1,4 +1,5 @@
-import type { FrameFeature } from '../contracts';
+import type { FrameFeature, SoundEvent } from '../contracts';
+import { intensityWord } from '../sound/intensity';
 
 /**
  * Unicode braille charts (U+2800–U+28FF). Each braille cell holds two columns of four dots, so one
@@ -45,9 +46,6 @@ export function braillePointer(index: number, length: number, cells = 40): strin
 }
 
 const dir = (lat: number) => `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? 'N' : 'S'}`;
-function intensityWord(mmDay: number) {
-  return mmDay < 2 ? 'dry' : mmDay < 5 ? 'light' : mmDay < 8 ? 'moderate' : mmDay < 14 ? 'heavy' : 'very heavy';
-}
 
 /** Plain-language description of one frame for screen readers and braille displays. */
 export function describeFrame(f: FrameFeature, all: FrameFeature[], measuredMmHr?: number | null): string {
@@ -74,4 +72,35 @@ export function describeCell(lat: number, lon: number, v: number | null, unit: s
   if (v == null) return `${where}: no value (coastline or label pixels).`;
   const mmDay = unit === 'mm/hr' ? v * 24 : v;
   return `${where}: ${v.toFixed(unit === 'mm/hr' ? 3 : 1)} ${unit}, ${intensityWord(mmDay)} (${derivation}).`;
+}
+
+/** Compress a sorted list of 0-based beat indexes into "1–3, 7" (1-based). */
+function beatList(b: number[]): string {
+  const out: string[] = [];
+  for (let i = 0; i < b.length; i++) {
+    let j = i;
+    while (j + 1 < b.length && b[j + 1] === b[j] + 1) j++;
+    out.push(j > i ? `${b[i] + 1}–${b[j] + 1}` : `${b[i] + 1}`);
+    i = j;
+  }
+  return out.join(', ');
+}
+
+/** Words for one sweep: which beats are silent, which notes (latitudes) the tune sits on, the loudest beat. */
+export function describeSweep(events: SoundEvent[], beats: number): string {
+  const notes = events.filter((e) => e.kind === 'scan' && e.scan?.beat != null);
+  if (!notes.length) return `All ${beats} beats are silent: no light rain or more anywhere in this view.`;
+  const sounding = [...new Set(notes.map((e) => e.scan!.beat!))].sort((a, b) => a - b);
+  const silent = Array.from({ length: beats }, (_, i) => i).filter((i) => !sounding.includes(i));
+  const count = new Map<string, { n: number; e: SoundEvent }>();
+  for (const e of notes) { const k = e.note!; const c = count.get(k); count.set(k, { n: (c?.n ?? 0) + 1, e: c?.e ?? e }); }
+  const common = [...count.values()].sort((a, b) => b.n - a.n).slice(0, 2).map(({ e }) => `${e.note} (${dir(e.scan!.latBand![0])} to ${dir(e.scan!.latBand![1])})`);
+  const loud = notes.reduce((a, b) => ((b.original.value ?? 0) > (a.original.value ?? 0) ? b : a));
+  const region = [...new Set(events.filter((e) => e.marker === 'region' && e.scan?.beat != null).map((e) => e.scan!.beat!))].sort((a, b) => a - b);
+  const parts = [`The sweep plays ${beats} beats from west to east.`];
+  parts.push(silent.length ? `Beats ${beatList(silent)} are silent (dry).` : 'Every beat has rain.');
+  parts.push(`The tune sits mostly on ${common.join(' and ')}.`);
+  parts.push(`The loudest note is beat ${loud.scan!.beat! + 1}: ${loud.scan!.intensity} rain near ${dir(loud.scan!.lat)}.`);
+  if (region.length) parts.push(`Beats ${beatList(region)} cover the Philippine sector (soft tick).`);
+  return parts.join(' ');
 }

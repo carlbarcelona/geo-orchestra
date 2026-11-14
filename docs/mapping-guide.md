@@ -1,4 +1,4 @@
-# Mapping guide (version `rain-v2`, frame sweep `scan-v2`)
+# Mapping guide (version `rain-v2`, frame sweep `scan-v3`)
 
 Sound is a **designed mapping** of satellite estimates. It is not a recording. The mapping is fixed across dates and regions, so the same sound always means the same thing.
 
@@ -52,7 +52,28 @@ Every step has a plain-language caption ("Now hearing"), for example:
 - The same text is used by screen-reader announcements on pause and step, and by the optional spoken narration (Accessibility → Speak summaries).
 - During playback, narration speaks only unusual months and rain-band turns.
 
-## Frame sweep (`scan-v2`): one learnable rule
+## Frame sweep (`scan-v3`): the whole frame, edge to edge
+
+`scan-v3` keeps every rule of `scan-v2` below and changes **what is swept** (decision 0002):
+
+- **The whole frame.** In the Visual feed's full view, the sweep reads the entire NASA SVS frame, 180°W → 180°E, from a whole-frame grid of 2.5° cells (144 × 72, `public/data/svs5478/frame-scan-global.bin`). It plays **24 beats** (15° of longitude each, about 10 s).
+- **Pitch table = the frame's own latitudes.** In the whole-frame view, the latitude → note table spans **60°S–60°N** (where IMERG has data), south = lowest, so north is still higher. The ROI view keeps the 10°S–30°N table and its 11 beats, and a crop uses the crop's own latitudes. Within one view, a latitude is always the same note.
+- **Rain systems.** A rain system is a connected patch (8-neighbour) of at least 3 cells at **heavy rain or more (≥ 8 mm/day**, where the colorbar turns green). Each one is a musical element of its own:
+
+| Rain system property | Sound and picture |
+| --- | --- |
+| Where the line enters and leaves it | A **held pad** starts when the scan line reaches the system and stops when the line leaves it |
+| Centre latitude (rain-weighted) | Pitch, from the same table as the beat notes |
+| Peak rain class | Loudness |
+| Zone: centre within 23.5° of the equator, or not | Timbre: **warm pad = tropical**, **darker horn = mid-latitude storm track** |
+| Centre longitude | Stereo position |
+| Its cells in the column under the line | The scan line **widens over exactly those latitudes**, in the zone's colour (teal tropical, violet mid-latitude), and the whole system lights up while the line is inside it. A label gives its number, zone, rain class and shape ("stretched southwest–northeast", from its long axis). |
+
+- Systems are numbered west → east. Systems already passed keep a faint outline. The Frame score outlines them too.
+- **Crop (optional).** "Crop sweep" lets the user drag a box on the full frame. The sweep, the score, the rain systems and the explore cursor then read only that box, and its beats (4 to 24) follow its width. "Full frame" clears it.
+- **Limits:** a system that crosses the 180° edge of the frame is counted as two, one at each edge. A system is a listening and viewing aid computed from image-derived values; it is never a new measurement, and never named as a storm or cyclone.
+
+### The `scan-v2` rules that still apply
 
 A frame (a NASA SVS image, or a measured IMERG month in the Numerical map) is turned into music by one rule:
 

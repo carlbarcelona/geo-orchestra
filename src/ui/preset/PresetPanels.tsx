@@ -81,7 +81,8 @@ export function ListeningGuide({ workspace }: { workspace: 'numerical' | 'visual
         sound.reference && ['Soft hum', 'the yearly average; above = wetter season, below = drier season'],
         ['String glide', 'the rain band’s latitude — higher = farther north'],
         ['Chime', 'the rain band turns around'],
-        ['Sweep (S)', `${SCAN.beats} beats west → east · pitch = latitude · louder = heavier · silence = dry`],
+        ['Sweep (S)', `the whole map, ${SCAN.global.beats} beats west → east · pitch = latitude · louder = heavier · silence = dry`],
+        ['Held pad', 'a rain system the line is crossing (warm = tropical, darker = storm track); it lights up on the map'],
       ];
   return (
     <div className="section listening-guide">

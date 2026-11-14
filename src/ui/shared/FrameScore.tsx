@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SoundEvent } from '../../contracts';
 import { describeSweep } from '../../a11y/braille';
 import { controller } from '../../playback/controller';
-import { analyzeBeats, fmtLat, latitudeBands, SCAN, type ScanGrid } from '../../sound/frameScan';
+import { analyzeBeats, detectSystems, fmtLat, fmtLon, latitudeBands, SCAN, type ScanGrid } from '../../sound/frameScan';
 import { midiToName, scaleNotes } from '../../sound/mapping';
 import { exploreAt, scanCurrent } from '../../state/actions';
 import { set, useStore } from '../../state/store';
@@ -65,7 +65,8 @@ export function FrameScore({ grid, events, title, tab, emptyText }: Props) {
   }, [size]);
 
   const beats = useMemo(() => (grid ? analyzeBeats(grid, sound) : []), [grid, sound.scale, sound.pitchLow, sound.pitchHigh]); // eslint-disable-line react-hooks/exhaustive-deps
-  const bands = useMemo(() => latitudeBands(scaleNotes(sound.scale, sound.pitchLow, sound.pitchHigh)), [sound.scale, sound.pitchLow, sound.pitchHigh]);
+  const bands = useMemo(() => latitudeBands(scaleNotes(sound.scale, sound.pitchLow, sound.pitchHigh), grid?.latRange ?? SCAN.latRange), [grid, sound.scale, sound.pitchLow, sound.pitchHigh]);
+  const systems = useMemo(() => (grid ? detectSystems(grid) : []), [grid]);
 
   useEffect(() => {
     const cv = canvasRef.current;
@@ -76,14 +77,18 @@ export function FrameScore({ grid, events, title, tab, emptyText }: Props) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size.w, size.h);
     const { left, top, plotW, plotH } = layout;
-    const lonMax = grid.lonMin + grid.ncol * grid.step, latMax = grid.latMin + grid.nrow * grid.step;
+    const lonMax = grid.lonMin + grid.ncol * grid.step;
+    // vertical extent = the latitudes the pitch table covers (the whole frame plays 60°S–60°N)
+    const [latLo, latMax] = grid.latRange ?? [grid.latMin, grid.latMin + grid.nrow * grid.step];
     const xOf = (lon: number) => left + ((lon - grid.lonMin) / (lonMax - grid.lonMin)) * plotW;
-    const yOf = (lat: number) => top + ((latMax - lat) / (latMax - grid.latMin)) * plotH;
-    const cw = plotW / grid.ncol, rh = plotH / grid.nrow;
+    const yOf = (lat: number) => top + ((latMax - lat) / (latMax - latLo)) * plotH;
+    const cw = plotW / grid.ncol, rh = (plotH * grid.step) / (latMax - latLo);
     // heat cells (faint background: what the frame shows)
     for (let r = 0; r < grid.nrow; r++) for (let c = 0; c < grid.ncol; c++) {
+      const rLat = grid.latMin + r * grid.step;
+      if (rLat < latLo - 1e-6 || rLat + grid.step > latMax + 1e-6) continue;
       const v = grid.value(r, c);
-      const y = top + (grid.nrow - 1 - r) * rh;
+      const y = yOf(rLat + grid.step);
       if (v == null) { ctx.fillStyle = 'rgba(120,120,120,0.2)'; ctx.fillRect(left + c * cw, y, cw, rh); continue; }
       const [R, G, B] = rampColor(Math.sqrt(Math.min(1, v / grid.refMax)));
       ctx.fillStyle = `rgba(${R | 0},${G | 0},${B | 0},0.35)`;
@@ -101,18 +106,32 @@ export function FrameScore({ grid, events, title, tab, emptyText }: Props) {
       if (!b.notes.length) { ctx.fillStyle = 'rgba(169,188,203,0.7)'; ctx.font = 'italic 10px Inter, sans-serif'; ctx.fillText('rest', (x0 + x1) / 2 - 9, top + plotH - 4); ctx.font = '10.5px JetBrains Mono, monospace'; }
     }
     // latitude bands = notes
-    const bandPx = plotH / ((latMax - grid.latMin) / (bands[0] ? bands[0].hi - bands[0].lo : 1));
+    const bandPx = plotH / ((latMax - latLo) / (bands[0] ? bands[0].hi - bands[0].lo : 1));
     const every = bandPx >= 12 ? 1 : bandPx >= 6 ? 2 : 4;
     bands.forEach((b, k) => {
-      if (b.hi <= grid.latMin || b.lo >= latMax) return;
-      const yLo = yOf(Math.max(b.lo, grid.latMin));
+      if (b.hi <= latLo || b.lo >= latMax) return;
+      const yLo = yOf(Math.max(b.lo, latLo));
       ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.beginPath(); ctx.moveTo(left, yLo); ctx.lineTo(left + plotW, yLo); ctx.stroke();
       if (k % every === 0) {
-        const yc = yOf((Math.max(b.lo, grid.latMin) + Math.min(b.hi, latMax)) / 2);
+        const yc = yOf((Math.max(b.lo, latLo) + Math.min(b.hi, latMax)) / 2);
         ctx.fillStyle = '#d5e2ec'; ctx.font = '10.5px JetBrains Mono, monospace';
         ctx.fillText(`${midiToName(b.midi).padEnd(3)} ${fmtLat((b.lo + b.hi) / 2)}`, 4, yc + 3.5);
       }
     });
+    // rain systems: outlined in their zone colour; lit while the playhead is inside them (held pad)
+    for (const s of systems) {
+      const lit = progress != null && progress * grid.ncol >= s.colRange[0] && progress * grid.ncol < s.colRange[1] + 1;
+      const rgb = s.zone === 'tropical' ? '94,234,212' : '196,181,253';
+      ctx.fillStyle = `rgba(${rgb},${lit ? 0.35 : 0.1})`;
+      for (const [c, [r0, r1]] of s.extents) {
+        const x = xOf(grid.lonMin + c * grid.step), y0 = yOf(grid.latMin + (r1 + 1) * grid.step), y1 = yOf(grid.latMin + r0 * grid.step);
+        ctx.fillRect(x, y0, cw, y1 - y0);
+      }
+      const xa = xOf(s.lonRange[0]), xb = xOf(s.lonRange[1]), ya = yOf(s.latRange[1]), yb = yOf(s.latRange[0]);
+      ctx.strokeStyle = `rgba(${rgb},${lit ? 1 : 0.55})`; ctx.lineWidth = lit ? 2 : 1;
+      ctx.strokeRect(xa, ya, xb - xa, yb - ya);
+      ctx.fillStyle = `rgb(${rgb})`; ctx.font = '10px Inter, sans-serif'; ctx.fillText(String(s.id), xa + 2, ya + 10);
+    }
     // the notes that sound: one dot per (beat, latitude band); size = rain class
     for (const e of events) {
       if (e.kind !== 'scan' || e.scan?.beat == null) continue;
@@ -126,14 +145,15 @@ export function FrameScore({ grid, events, title, tab, emptyText }: Props) {
     }
     // axes
     ctx.fillStyle = '#a9bccb'; ctx.font = '11px JetBrains Mono, monospace';
-    for (const b of beats) if (b.beat % 2 === 0) ctx.fillText(`${Math.round(b.lon[0])}°E`, xOf(b.lon[0]) + 2, top + plotH + 14);
+    const labelEvery = Math.max(2, Math.ceil(beats.length / 8));
+    for (const b of beats) if (b.beat % labelEvery === 0) ctx.fillText(fmtLon(Math.round(b.lon[0])), xOf(b.lon[0]) + 2, top + plotH + 14);
     ctx.font = '11px Inter, sans-serif';
     ctx.fillText('note · latitude', 4, 14);
     ctx.fillText('beat →', left + plotW - 44, top + plotH + 26);
     // explore cursor
     if (explore && explore.col < grid.ncol && explore.row < grid.nrow) {
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
-      ctx.strokeRect(left + explore.col * cw - 1, top + (grid.nrow - 1 - explore.row) * rh - 1, cw + 2, rh + 2);
+      ctx.strokeRect(left + explore.col * cw - 1, yOf(grid.latMin + (explore.row + 1) * grid.step) - 1, cw + 2, rh + 2);
     }
     // sweep playhead
     if (progress != null) {
@@ -141,14 +161,16 @@ export function FrameScore({ grid, events, title, tab, emptyText }: Props) {
       ctx.strokeStyle = '#f5b942'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(x, top - 4); ctx.lineTo(x, top + plotH); ctx.stroke();
     }
-  }, [grid, events, size, layout, progress, selectedId, explore, beats, bands]);
+  }, [grid, events, size, layout, progress, selectedId, explore, beats, bands, systems]);
 
   if (!grid) return <div className="empty"><I.Image size={28} /><div className="big">{emptyText}</div></div>;
 
   const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     const col = Math.floor(((e.clientX - r.left - layout.left) / layout.plotW) * grid.ncol);
-    const row = grid.nrow - 1 - Math.floor(((e.clientY - r.top - layout.top) / layout.plotH) * grid.nrow);
+    const [latLo, latHi] = grid.latRange ?? [grid.latMin, grid.latMin + grid.nrow * grid.step];
+    const lat0 = latHi - ((e.clientY - r.top - layout.top) / layout.plotH) * (latHi - latLo);
+    const row = Math.floor((lat0 - grid.latMin) / grid.step);
     if (col < 0 || row < 0 || col >= grid.ncol || row >= grid.nrow) return;
     const lat = grid.latMin + (row + 0.5) * grid.step, lon = grid.lonMin + (col + 0.5) * grid.step;
     const hit = events.find((ev) => ev.kind === 'scan' && ev.scan?.latBand && lat >= ev.scan.latBand[0] && lat < ev.scan.latBand[1]
@@ -169,7 +191,7 @@ export function FrameScore({ grid, events, title, tab, emptyText }: Props) {
         <button className="btn small primary" onClick={() => void scanCurrent()} aria-keyshortcuts="S"><I.Play size={13} /> Sweep this {tab === 'visual' ? 'frame' : 'month'} (S)</button>
       </div>
       <div className="score-rule" aria-hidden="true">
-        <span><b>Pitch</b> = latitude (north higher)</span><span><b>Loudness</b> = rain class (dot size)</span><span><b>Silence</b> = dry</span><span><b>{SCAN.beats} beats</b> west → east</span><span className="score-ph">▮ Philippine sector (soft tick)</span>
+        <span><b>Pitch</b> = latitude (north higher)</span><span><b>Loudness</b> = rain class (dot size)</span><span><b>Silence</b> = dry</span><span><b>{beats.length} beats</b> west → east</span><span><b>Held pad</b> = rain system (outlined)</span>{grid.area == null && <span className="score-ph">▮ Philippine sector (soft tick)</span>}
       </div>
       <div ref={wrapRef} style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', cursor: 'crosshair' }} onClick={onClick}

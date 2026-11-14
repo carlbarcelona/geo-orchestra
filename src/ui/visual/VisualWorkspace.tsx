@@ -2,12 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { controller } from '../../playback/controller';
 import {
   connectClimatology, currentScanEvents, currentScanGrid, disconnectClimatology, exploreAt, exploreMove, frameReady, importVisualFeed, loadFrame,
-  quickStartVisual, scanCurrent, seasonalEventsCached, seasonalObservations, seek, setImage, setTab, setVisual, setVisualRegion, svsUrl, togglePlay,
+  quickStartVisual, scanCurrent, visualScanGrid, seasonalEventsCached, seasonalObservations, seek, setImage, setTab, setVisual, setVisualRegion, svsUrl, togglePlay,
 } from '../../state/actions';
 import { describeFrame, describeSweep } from '../../a11y/braille';
 import { seasonalContexts } from '../../sound/context';
 import { MAPPING } from '../../sound/mapping';
-import { columnProfile, SCAN } from '../../sound/frameScan';
+import { columnProfile, detectSystems, fmtLat, fmtLon, SCAN } from '../../sound/frameScan';
+import { CropLayer, ScanOverlay } from './ScanOverlay';
 import { ListeningGuide, ListeningPresetCards, NarrationToggle } from '../preset/PresetPanels';
 import { BrailleChart } from '../shared/BrailleChart';
 import { FrameScore, useSweepProgress } from '../shared/FrameScore';
@@ -31,7 +32,7 @@ export function VisualWorkspace() {
   const image = useStore((s) => s.image);
   const events = useMemo(() => (linked ? seasonalEventsCached() : []), [linked, link.climatology, visual.regionId, sound.scale, sound.pitchLow, sound.pitchHigh, frameScan.state, image]); // eslint-disable-line react-hooks/exhaustive-deps
   const labels = useMemo(() => media.manifest?.frames.map((f) => f.label) ?? [], [media.manifest]);
-  const grid = useMemo(() => currentScanGrid(), [visual.day, frameScan.state, image.enabled, media.state]); // eslint-disable-line react-hooks/exhaustive-deps
+  const grid = useMemo(() => currentScanGrid(), [visual.day, visual.roi, visual.crop, frameScan.state, image.enabled, media.state]); // eslint-disable-line react-hooks/exhaustive-deps
   const scanEvents = useMemo(() => (grid ? currentScanEvents() : []), [grid, sound.scale, sound.pitchLow, sound.pitchHigh]); // eslint-disable-line react-hooks/exhaustive-deps
   const frameLabel = media.manifest?.frames[visual.day]?.label;
   const preset = useStore((s) => s.uiMode === 'preset');
@@ -52,7 +53,7 @@ export function VisualWorkspace() {
           footNote="Video frame index ≠ calendar day · each frame's date is read from the SVS date overlays (366 days, incl. Feb 29)"
           score={{
             label: 'Frame score', available: !!grid, events: scanEvents,
-            node: <FrameScore grid={grid} events={scanEvents} tab="visual" title={`Frame score · ${frameLabel ?? ''} · West Pacific 95–150°E`}
+            node: <FrameScore grid={grid} events={scanEvents} tab="visual" title={`Frame score · ${frameLabel ?? ''} · ${visual.roi ? 'West Pacific 95–150°E' : grid?.area === 'whole frame' ? 'whole frame, 180°W–180°E' : grid?.area ?? ''}`}
               emptyText={media.state !== 'ready' ? 'Import the visual feed to turn each frame into a score' : frameScan.state === 'loading' ? 'Decoding frames…' : !image.enabled ? 'Image features are off (Sound Studio)' : 'Frame data unavailable'} />,
           }}
         />
@@ -192,6 +193,18 @@ function VisualFeed({ preset }: { preset: boolean }) {
   const scanDoc = useStore((s) => s.frameScan.doc);
   const imageOn = useStore((s) => s.image.enabled);
   const sweepP = useSweepProgress('visual');
+  const globalBytes = useStore((s) => s.frameScan.globalBytes);
+  const reduced = useStore((s) => s.a11y.reducedMotion);
+  // the grid the sweep reads: the whole frame (or the user's crop) in the full view, the West Pacific grid in ROI view
+  const sg = useMemo(() => (scanDoc && imageOn ? visualScanGrid(visual.day) : null), [scanDoc, globalBytes, imageOn, visual.day, visual.roi, visual.crop]); // eslint-disable-line react-hooks/exhaustive-deps
+  const systems = useMemo(() => (sg ? detectSystems(sg) : []), [sg]);
+  const canCrop = !visual.roi && !!globalBytes && imageOn;
+  useEffect(() => {
+    if (!visual.cropping) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setVisual({ cropping: false }); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [visual.cropping]);
 
   useEffect(() => {
     if (!frames) { setDisplayed(null); return; }
@@ -226,7 +239,10 @@ function VisualFeed({ preset }: { preset: boolean }) {
         </div>
         <button className={`btn small ${visual.roi ? 'active' : ''}`} aria-pressed={visual.roi} onClick={() => setVisual({ roi: !visual.roi })} disabled={!media.manifest}><I.Roi /> ROI</button>
         {!preset && <select value={visual.fit} onChange={(e) => setVisual({ fit: e.target.value as 'fit' | 'fill' })} aria-label="Image fit"><option value="fit">Fit</option><option value="fill">Fill</option></select>}
-        <button className="btn small" onClick={() => void scanCurrent()} disabled={!scanDoc || !imageOn || media.state !== 'ready'} aria-keyshortcuts="S"><I.Wave size={14} /> Sweep frame</button>
+        <button className={`btn small ${visual.cropping ? 'active' : ''}`} aria-pressed={visual.cropping} disabled={!canCrop || media.state !== 'ready'}
+          onClick={() => setVisual({ cropping: !visual.cropping })} title="Drag a box on the map so the sweep reads only that part"><I.Roi /> Crop sweep</button>
+        {visual.crop && !visual.roi && <button className="btn small" onClick={() => setVisual({ crop: null, cropping: false })} title="Sweep the entire frame again"><I.X size={13} /> Full frame</button>}
+        <button className="btn small" onClick={() => void scanCurrent()} disabled={!scanDoc || !imageOn || media.state !== 'ready'} aria-keyshortcuts="S"><I.Wave size={14} /> {visual.roi ? 'Sweep ROI' : visual.crop ? 'Sweep crop' : 'Sweep frame'}</button>
         <button className="btn icon small" onClick={fullscreen} aria-label="Toggle fullscreen"><I.Expand /></button>
       </div>
       <div className={`frame-wrap ${visual.roi ? 'roi' : ''}`} ref={stage.ref}>
@@ -252,7 +268,7 @@ function VisualFeed({ preset }: { preset: boolean }) {
           <>
             <div style={{ position: 'relative', width: stage.w, height: stage.h, flex: 'none', outline: 'none' }}
               tabIndex={scanDoc && imageOn ? 0 : -1} role="application"
-              aria-label="Explore the frame by touch or keyboard: arrow keys move a 1-degree cursor over the West Pacific region and you hear and read the rain there. Press S to sweep the whole frame."
+              aria-label={`Explore the frame by touch or keyboard: arrow keys move a ${sg?.step ?? 1}-degree cursor over ${sg?.area ?? 'the frame'} and you hear and read the rain there. Press S to sweep it west to east.`}
               onKeyDown={(e) => {
                 const k: Record<string, [number, number]> = { ArrowUp: [1, 0], ArrowDown: [-1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
                 if (k[e.key]) { e.preventDefault(); e.stopPropagation(); exploreMove(k[e.key][0] * (e.shiftKey ? 5 : 1), k[e.key][1] * (e.shiftKey ? 5 : 1)); }
@@ -262,7 +278,8 @@ function VisualFeed({ preset }: { preset: boolean }) {
                 const r = e.currentTarget.getBoundingClientRect();
                 const lon = box.lonMin + ((e.clientX - r.left) / r.width) * (box.lonMax - box.lonMin);
                 const lat = box.latMax - ((e.clientY - r.top) / r.height) * (box.latMax - box.latMin);
-                const g = scanDoc.grid;
+                const g = sg;
+                if (!g) return;
                 const col = Math.floor((lon - g.lonMin) / g.step), row = Math.floor((lat - g.latMin) / g.step);
                 if (col >= 0 && row >= 0 && col < g.ncol && row < g.nrow && (explore?.col !== col || explore?.row !== row)) exploreAt(row, col);
               }}>
@@ -275,12 +292,13 @@ function VisualFeed({ preset }: { preset: boolean }) {
               </>
             )}
             {visual.roi && <div className="roi-box" style={{ left: `${a.x}%`, top: `${a.y}%`, width: `${b.x - a.x}%`, height: `${b.y - a.y}%` }} />}
-            {scanDoc && imageOn && (() => {
-              const g = scanDoc.grid;
-              const sa = pct(g.lonMin, g.latMin + g.nrow * g.step), sb = pct(g.lonMin + g.ncol * g.step, g.latMin);
+            {sg && imageOn && (() => {
+              const g = sg;
+              const ca0 = visual.crop && !visual.roi ? pct(visual.crop.lonMin, visual.crop.latMax) : null, ca1 = visual.crop && !visual.roi ? pct(visual.crop.lonMax, visual.crop.latMin) : null;
               return (
                 <>
-                  {sweepP != null && <div aria-hidden="true" style={{ position: 'absolute', left: `${sa.x + (sb.x - sa.x) * sweepP}%`, top: `${sa.y}%`, height: `${sb.y - sa.y}%`, width: 2, background: '#f5b942', boxShadow: '0 0 8px #f5b942' }} />}
+                  {ca0 && ca1 && <div className="crop-box" aria-hidden="true" style={{ left: `${ca0.x}%`, top: `${ca0.y}%`, width: `${ca1.x - ca0.x}%`, height: `${ca1.y - ca0.y}%` }}><span>Sweep crop · {fmtLat(visual.crop!.latMin)}–{fmtLat(visual.crop!.latMax)}, {fmtLon(visual.crop!.lonMin)}–{fmtLon(visual.crop!.lonMax)}</span></div>}
+                  <ScanOverlay grid={g} systems={systems} box={box} progress={sweepP} reduced={reduced} />
                   {explore && (() => {
                     const ca = pct(g.lonMin + explore.col * g.step, g.latMin + (explore.row + 1) * g.step), cb = pct(g.lonMin + (explore.col + 1) * g.step, g.latMin + explore.row * g.step);
                     return <div aria-hidden="true" style={{ position: 'absolute', left: `${ca.x}%`, top: `${ca.y}%`, width: `${cb.x - ca.x}%`, height: `${cb.y - ca.y}%`, border: '2px solid #fff', boxShadow: '0 0 0 1px #000' }} />;
@@ -288,6 +306,7 @@ function VisualFeed({ preset }: { preset: boolean }) {
                 </>
               );
             })()}
+            {visual.cropping && canCrop && <CropLayer box={box} onDone={(c) => setVisual({ crop: c ?? visual.crop, cropping: false })} />}
             </div>
             <div className="frame-label" style={{ top: 10, left: 10, fontWeight: 600 }}>IMERG precipitation climatology</div>
             <div className="frame-label" style={{ top: 10, right: 10, fontSize: 12 }}>Authentic NASA SVS frame #{shownFrame?.sourceFrame}</div>
@@ -429,7 +448,7 @@ function PresetSoundStudio() {
         <MasterVolume />
         <NarrationToggle />
         <div style={{ marginBottom: 8 }}><LegendButton /></div>
-        <p className="muted" style={{ fontSize: 11.5 }}>Press <span className="kbd">S</span> to hear the current frame as {SCAN.beats} beats from west to east.</p>
+        <p className="muted" style={{ fontSize: 11.5 }}>Press <span className="kbd">S</span> to hear the whole frame as {SCAN.global.beats} beats from west to east (the ROI view sweeps {SCAN.beats} beats). Rain systems light up as the line crosses them.</p>
       </div>
     </section>
   );
@@ -462,7 +481,7 @@ function FrameDescribe() {
   const imageOn = useStore((s) => s.image.enabled);
   const media = useStore((s) => s.media);
   const link = useStore((s) => s.link);
-  const grid = useMemo(() => currentScanGrid(), [visual.day, doc, imageOn, media.state]); // eslint-disable-line react-hooks/exhaustive-deps
+  const grid = useMemo(() => currentScanGrid(), [visual.day, visual.roi, visual.crop, doc, imageOn, media.state]); // eslint-disable-line react-hooks/exhaustive-deps
   const meas = useMemo(() => seasonalObservations(), [link.climatology, visual.regionId, media.manifest]); // eslint-disable-line react-hooks/exhaustive-deps
   const sweepEv = useMemo(() => (grid ? currentScanEvents() : []), [grid]); // eslint-disable-line react-hooks/exhaustive-deps
   if (media.state !== 'ready') return <div className="empty"><I.Info size={28} /><div className="big">Import the visual feed to hear and read each frame</div></div>;
@@ -477,7 +496,7 @@ function FrameDescribe() {
   return (
     <div>
       <p style={{ margin: '0 0 8px', fontSize: 13.5, lineHeight: 1.45 }}>{describeFrame(f, doc.days, meas[visual.day]?.value ?? null)}</p>
-      <p className="dim" style={{ margin: '0 0 8px', fontSize: 12.5, lineHeight: 1.45 }}><b>The frame as music:</b> {describeSweep(sweepEv, SCAN.beats)}</p>
+      <p className="dim" style={{ margin: '0 0 8px', fontSize: 12.5, lineHeight: 1.45 }}><b>The frame as music:</b> {describeSweep(sweepEv, grid.beats ?? SCAN.beats)}</p>
       <div className="row" style={{ marginBottom: 8, flexWrap: 'wrap' }}>
         <button className="btn small primary" onClick={() => void scanCurrent()}><I.Wave size={13} /> Sweep this frame (S)</button>
         <span className="muted" style={{ fontSize: 11.5 }}>Explore: focus the frame, then use the arrow keys (Shift = 5°)</span>

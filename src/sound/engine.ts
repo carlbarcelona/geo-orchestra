@@ -48,6 +48,9 @@ class SoundEngine {
   private scanPool: { panner: Tone.Panner; synth: Tone.Synth }[] = [];
   private scanNext = 0;
   private featureVoice!: Tone.Synth;
+  /** rain-system voices (scan-v3): one pad per zone, panned by the system's position */
+  private systemVoices: { tropical: Tone.PolySynth; extratropical: Tone.PolySynth; panner: Tone.Panner }[] = [];
+  private systemNext = 0;
   private featureOn = false;
   private reverb!: Tone.Freeverb;
   private instrument!: Tone.PolySynth;
@@ -110,6 +113,14 @@ class SoundEngine {
     const fvFilter = new Tone.Filter({ type: 'lowpass', frequency: 1400, Q: 0.6 }).connect(this.imageCh);
     this.featureVoice = new Tone.Synth({ oscillator: { type: 'sawtooth' }, portamento: 0.12, envelope: { attack: 0.25, decay: 0.3, sustain: 0.7, release: 0.8 } }).connect(fvFilter);
     this.featureVoice.volume.value = -20;
+    for (let i = 0; i < 6; i++) {
+      const panner = new Tone.Panner(0).connect(this.imageCh);
+      const tropical = new Tone.PolySynth(Tone.AMSynth, { harmonicity: 2, envelope: { attack: 0.18, decay: 0.2, sustain: 0.8, release: 0.6 } } as any).connect(panner);
+      tropical.volume.value = -17;
+      const extratropical = new Tone.PolySynth(Tone.FMSynth, { harmonicity: 1, modulationIndex: 2.5, oscillator: { type: 'sine' }, envelope: { attack: 0.22, decay: 0.3, sustain: 0.7, release: 0.7 } } as any).connect(panner);
+      extratropical.volume.value = -19;
+      this.systemVoices.push({ tropical, extratropical, panner });
+    }
     this.instrument = this.makeInstrument(this.instrumentId);
     for (let i = 0; i < 5; i++) {
       const panner = new Tone.Panner(0).connect(this.melodyCh);
@@ -203,6 +214,13 @@ class SoundEngine {
         if (mode === 'musical') this.harmony.triggerAttackRelease(ev.chord.map((m) => Tone.Frequency(m, 'midi').toFrequency()), dur, at, ev.velocity ?? 0.3);
         continue;
       }
+      if (ev.kind === 'system' && ev.midi != null && ev.system) {
+        const v = this.systemVoices[this.systemNext++ % this.systemVoices.length];
+        v.panner.pan.setValueAtTime(ev.pan ?? 0, at);
+        const synth = ev.system.zone === 'tropical' ? v.tropical : v.extratropical;
+        synth.triggerAttackRelease(Tone.Frequency(ev.midi, 'midi').toFrequency(), Math.max(0.15, ev.duration * stepSeconds), at, ev.velocity ?? 0.5);
+        continue;
+      }
       if (ev.kind === 'scan' && ev.midi != null) {
         const slot = this.scanPool[this.scanNext++ % this.scanPool.length];
         slot.panner.pan.setValueAtTime(ev.pan ?? 0, at);
@@ -282,6 +300,7 @@ class SoundEngine {
     this.drops.releaseAll(now);
     this.samplers.forEach((s) => s.synth.triggerRelease(now));
     this.scanPool.forEach((s) => s.synth.triggerRelease(now));
+    this.systemVoices.forEach((v) => { v.tropical.releaseAll(now); v.extratropical.releaseAll(now); });
     if (this.featureOn) { this.featureVoice.triggerRelease(now); this.featureOn = false; }
     if (this.refOn) { this.refVoice.triggerRelease(now); this.refOn = false; }
     this.harmony.releaseAll(now);

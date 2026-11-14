@@ -94,6 +94,14 @@ The console showed no application errors.
   - timelapse with a sweep on every frame, at 1 day/s
   - no console errors
 
+## Whole-frame grid and rain systems (`scan-v3`, 15 Nov 2026)
+
+- **Decode:** the same colorbar lookup as the West Pacific grid, applied to every pixel of the 2048×1024 source frames and averaged into 2.5° cells (cells need half their pixels decodable). 0.28% of pixels are undecodable. The West Pacific outputs (`frame-scan.bin`, `frame-features.json` days and validation) came out byte-identical.
+- **Agreement:** for 120–130°E, 5–15°N on Jul 15, the whole-frame mean is within 1.5 mm/day of the 1° West Pacific grid (asserted in `tests/fullframe.test.ts`).
+- **Rain systems on real frames:** 4 to 16 per day (median 9). Jan 15 has 14, including the West Pacific / Maritime Continent rain area (85°E–180°, 248 cells). Jul 15 has 7.
+- **Automated:** `tests/fullframe.test.ts` (12 tests) covers whole-frame coverage, 24 beats edge to edge, the 60°S–60°N table, the overlap check, system grouping, column extents, shape words, thresholds, held-note timing, the spoken description and crop snapping. 86 tests pass in total.
+- **Not yet done:** a browser walkthrough and listening on speakers.
+
 ## rain-v2, scan-v2 and Preset mode (15 Nov 2026, Claude in Chrome, localhost)
 
 - Fresh load shows Preset. **Start listening** loaded 295 months, selected the Philippines and played from Jun 2000. The caption read, for example, "Dec 2000 · 0.392 mm/hr · wetter than a normal December (+0.6 SD) · you hear melody above the hum, bright (major) chord".

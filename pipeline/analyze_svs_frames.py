@@ -6,6 +6,7 @@ Input : data/raw/svs5478/SOS_IMERG_cbar_1000px.png (colorbar, 0-24 mm/day)
         public/data/svs5478/climatology-ph.json          (reconstructed IMERG climatology, for cross-validation)
         data/raw/ne/admin0.geojson                       (Philippines outline for the land-mask comparison)
 Output: public/data/svs5478/frame-scan.bin      uint8 [day][row][col], 0.1 mm/day per step, 255 = unknown
+        public/data/svs5478/frame-scan-global.bin same layout for the WHOLE frame at 2.5 degrees (144 x 72 cells)
         public/data/svs5478/frame-features.json per-day features + decodeValidation
 
 These values are IMAGE-DERIVED: colours are decoded back to mm/day through the colorbar. They are approximate,
@@ -39,6 +40,8 @@ MAX_DIST = 40.0                           # colours farther than this from the c
 ROI = {"lonMin": 95.0, "lonMax": 150.0, "latMin": -10.0, "latMax": 30.0}
 NCOL, NROW = 55, 40                       # 1 degree cells
 MIN_KNOWN = 0.5
+GLOBAL_STEP = 2.5                         # whole-frame grid: 144 x 72 cells, 2.5 degrees
+GNCOL, GNROW = int(360 / GLOBAL_STEP), int(180 / GLOBAL_STEP)
 WET_MM_DAY = 8.0                          # colorbar turns green at 8 mm/day
 SECTOR = (115.0, 130.0)                   # Philippine longitude sector for the rain-band latitude
 PH_BOX = (116.0, 127.5, 4.5, 21.5)        # lon0, lon1, lat0, lat1
@@ -118,11 +121,26 @@ def main():
     row_of = np.clip(((LAT - ROI["latMin"]) // 1).astype(int), 0, NROW - 1)   # row 0 = south
 
     grids = np.full((len(manifest["frames"]), NROW, NCOL), 255, dtype=np.uint8)
+    # whole-frame cell index for every pixel (row 0 = south), for a fast bincount mean
+    gx = np.minimum(((np.arange(W) + 0.5) / W * 360 // GLOBAL_STEP).astype(int), GNCOL - 1)
+    gy = np.minimum(((180 - (np.arange(H) + 0.5) / H * 180) // GLOBAL_STEP).astype(int), GNROW - 1)
+    gcell = (gy[:, None] * GNCOL + gx[None, :]).ravel()
+    gpix = np.bincount(gcell, minlength=GNCOL * GNROW)
+    global_grids = np.full((len(manifest["frames"]), GNROW, GNCOL), 255, dtype=np.uint8)
+    global_unknown = 0.0
     feats = []
     unknown_total = 0.0
     for f in manifest["frames"]:
         d = f["day"] - 1
         im = np.asarray(Image.open(RAW / "svs5478" / "frames" / f"{f['sourceFrame']:05d}.png").convert("RGB"))
+        gv = decode(im.astype(np.int64), cube).ravel()
+        gk = ~np.isnan(gv)
+        global_unknown += 1 - gk.mean()
+        gsum = np.bincount(gcell[gk], weights=gv[gk], minlength=GNCOL * GNROW)
+        gn = np.bincount(gcell[gk], minlength=GNCOL * GNROW)
+        gok = gn >= MIN_KNOWN * gpix
+        gmean = np.where(gok, gsum / np.maximum(gn, 1), np.nan)
+        global_grids[d] = np.where(gok, np.clip(np.round(gmean * 10), 0, 254), 255).reshape(GNROW, GNCOL).astype(np.uint8)
         crop = im[y0:y1, x0:x1].astype(np.int64)
         v = decode(crop, cube)
         known = ~np.isnan(v)
@@ -184,9 +202,13 @@ def main():
     doc = {"contract": "frame-scan", "version": 1, "unit": "mm/day", "source": "decoded from NASA SVS 5478 frames via the published colorbar",
            "grid": {"ncol": NCOL, "nrow": NROW, "lonMin": ROI["lonMin"], "latMin": ROI["latMin"], "step": 1.0, "scale": 0.1, "unknown": 255,
                     "layout": "uint8 [day][row][col], row 0 = southernmost (-9.5°), col 0 = westernmost (95.5°E)", "path": "frame-scan.bin"},
+           "globalGrid": {"ncol": GNCOL, "nrow": GNROW, "lonMin": -180.0, "latMin": -90.0, "step": GLOBAL_STEP, "scale": 0.1, "unknown": 255,
+                          "layout": "uint8 [day][row][col], whole frame, row 0 = southernmost (-88.75), col 0 = westernmost (-178.75); cell = mean of decodable pixels",
+                          "path": "frame-scan-global.bin", "unknownPixelPct": round(global_unknown / len(feats) * 100, 2)},
            "thresholds": {"wetMmDay": WET_MM_DAY, "sectorLon": list(SECTOR), "phBox": list(PH_BOX)},
            "decodeValidation": validation, "days": feats}
     grids.tofile(OUT / "frame-scan.bin")
+    global_grids.tofile(OUT / "frame-scan-global.bin")
     (OUT / "frame-features.json").write_text(json.dumps(doc, separators=(",", ":")))
     print(json.dumps(validation, indent=1))
     if r < 0.8:

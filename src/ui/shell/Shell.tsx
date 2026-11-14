@@ -217,7 +217,7 @@ export function Dialogs() {
           <h3 className="legend-h">3 · Where is the rain? (frame sweep, bells and the string glide)</h3>
           <p className="dim" style={{ fontSize: 12.5, margin: '0 0 6px' }}>
             Pitch = <b>latitude</b> (each note is a 2.5° band: C4 ≈ 2.5–5°N, the Philippines is about D4–D5) · loudness = <b>rain class</b> (light, moderate, heavy, very heavy) ·
-            silence = <b>dry</b> · a sweep is <b>{SCAN.beats} beats from west to east</b>, with a soft tick on the beats over the Philippine sector. Press <span className="kbd">S</span> to hear the current frame.
+            silence = <b>dry</b> · a sweep reads the <b>whole frame in {SCAN.global.beats} beats from west to east</b> (the ROI view: {SCAN.beats} beats, with a soft tick over the Philippine sector). In the whole-frame view the pitch table spans 60°S–60°N, so north is still higher. A <b>held pad</b> is a <b>rain system</b> (a connected area of heavy rain): it starts when the scan line reaches it and stops when the line leaves it; warm pad = tropical, darker horn = mid-latitude storm track. Press <span className="kbd">S</span> to hear the current frame.
           </p>
           <p style={{ marginTop: 10 }}>Sounds are designed mappings of satellite estimates, not recordings. Instrument and volume change the timbre and loudness only, never the underlying values.</p>
         </Dialog>

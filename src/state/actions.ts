@@ -2,7 +2,7 @@ import type { AlignmentEvidence, ClimatologyLinkage, FrameScanDoc, Observation, 
 import { describeCell, describeFrame } from '../a11y/braille';
 import { speak, spokenForm, stopSpeaking } from '../a11y/speech';
 import { explainStep, monthlyContexts, seasonalContexts } from '../sound/context';
-import { cellEvent, featureEvents, frameGrid, imergGrid, scanEvents, type ScanGrid } from '../sound/frameScan';
+import { cellEvent, cropGrid, featureEvents, frameGrid, frameGridGlobal, imergGrid, SCAN, scanEvents, type ScanGrid } from '../sound/frameScan';
 import { DEFAULT_PRESET, getPreset, type ListeningPresetId } from '../sound/presets';
 import { ProjectFileSchema, type ProjectFile } from '../contracts';
 import { areaSelection, cellSelection, monthLabel, observationsFor, type Dataset } from '../data/dataset';
@@ -425,7 +425,8 @@ function seasonalEvents(): SoundEvent[][] {
     const feats = image.featureVoice ? featureEvents(frameScan.doc.days, { scale: sound.scale, pitchLow: sound.pitchLow, pitchHigh: sound.pitchHigh }) : [];
     steps.forEach((step, i) => {
       if (feats[i]) step.push(...feats[i]);
-      if (image.sweepEveryFrame) step.push(...scanEvents(frameGrid(frameScan.doc!, frameScan.bytes!, i), {
+      const fg = image.sweepEveryFrame ? visualScanGrid(i) : null;
+      if (fg) step.push(...scanEvents(fg, {
         scale: sound.scale, pitchLow: sound.pitchLow, pitchHigh: sound.pitchHigh, stepIndex: i, t: `D${String(i + 1).padStart(3, '0')}`,
         label: `${labels[i]} frame sweep`, datasetId: 'svs5478-frames', selectionId: 'frame', offsetStart: 0.05, span: 0.9,
       }));
@@ -439,16 +440,23 @@ export function seasonalEventsCached() { return seasonalEvents(); }
 export async function loadFrameScan() {
   const st = get().frameScan.state;
   if (st === 'ready' || st === 'loading') return;
-  set({ frameScan: { state: 'loading', doc: null, bytes: null, message: 'Loading decoded frame data' } });
+  set({ frameScan: { state: 'loading', doc: null, bytes: null, globalBytes: null, message: 'Loading decoded frame data' } });
   try {
     const doc = await fetch(svsUrl('frame-features.json')).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() as Promise<FrameScanDoc>; });
     const buf = await fetch(svsUrl(doc.grid.path)).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); });
     const n = doc.days.length * doc.grid.nrow * doc.grid.ncol;
     if (buf.byteLength !== n) throw new Error(`frame-scan size ${buf.byteLength} does not match ${n}`);
-    set({ frameScan: { state: 'ready', doc, bytes: new Uint8Array(buf), message: '' } });
+    let globalBytes: Uint8Array | null = null;
+    if (doc.globalGrid) {
+      const gb = await fetch(svsUrl(doc.globalGrid.path)).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); });
+      const gn = doc.days.length * doc.globalGrid.nrow * doc.globalGrid.ncol;
+      if (gb.byteLength !== gn) throw new Error(`frame-scan-global size ${gb.byteLength} does not match ${gn}`);
+      globalBytes = new Uint8Array(gb);
+    }
+    set({ frameScan: { state: 'ready', doc, bytes: new Uint8Array(buf), globalBytes, message: '' } });
     if (controller.adapterId === 'seasonal') controller.updateEvents(seasonalEvents());
   } catch (e) {
-    set({ frameScan: { state: 'error', doc: null, bytes: null, message: (e as Error).message } });
+    set({ frameScan: { state: 'error', doc: null, bytes: null, globalBytes: null, message: (e as Error).message } });
   }
 }
 
@@ -461,12 +469,27 @@ export function setImage(patch: Partial<ReturnType<typeof get>['image']>) {
   if (controller.adapterId === 'seasonal') controller.updateEvents(seasonalEvents());
 }
 
+/**
+ * The decoded SVS grid a sweep acts on for `day`: the WHOLE frame (or the user's crop of it) in the full view,
+ * the West Pacific grid in the ROI view.
+ */
+export function visualScanGrid(day: number): ScanGrid | null {
+  const s = get();
+  if (!s.frameScan.doc || !s.frameScan.bytes) return null;
+  if (!s.visual.roi && s.frameScan.globalBytes) {
+    const g = frameGridGlobal(s.frameScan.doc, s.frameScan.globalBytes, day);
+    if (g && s.visual.crop) return cropGrid(g, s.visual.crop) ?? g;
+    if (g) return g;
+  }
+  return frameGrid(s.frameScan.doc, s.frameScan.bytes, day);
+}
+
 /** The grid a sweep/explore acts on: decoded SVS frame (visual tab) or measured IMERG month (numerical tab). */
 export function currentScanGrid(): ScanGrid | null {
   const s = get();
   if (s.tab === 'visual') {
-    if (!s.image.enabled || !s.frameScan.doc || !s.frameScan.bytes || s.media.state !== 'ready') return null;
-    return frameGrid(s.frameScan.doc, s.frameScan.bytes, s.visual.day);
+    if (!s.image.enabled || s.media.state !== 'ready') return null;
+    return visualScanGrid(s.visual.day);
   }
   return s.dataset?.grid ? imergGrid(s.dataset.grid, s.cursor) : null;
 }
@@ -490,12 +513,14 @@ export async function scanCurrent() {
   const events = currentScanEvents();
   if (!events.length) { announce('Nothing to sweep yet: load the data or import the visual feed first.'); return; }
   if (controller.state !== 'stopped') controller.pause('frame sweep');
-  const seconds = get().tab === 'visual' ? 4.5 : 3.5;
+  const g = currentScanGrid();
+  const seconds = get().tab === 'visual' ? +Math.max(4.5, (g?.beats ?? SCAN.beats) * SCAN.secondsPerBeat).toFixed(1) : 3.5;
   const t0 = await engine.playSweep(events, seconds, get().sound.mode);
   if (t0 == null) { announce('Audio could not start.'); return; }
   const startedAt = performance.now() + Math.max(0, (t0 - engine.now()) * 1000);
   set({ sweep: { active: true, startedAt, seconds, tab: get().tab }, chartTab: 'score' });
-  announce(`Sweeping west to east over ${seconds} seconds. Higher pitch means farther north; louder means more rain.`);
+  const systems = events.filter((e) => e.kind === 'system').length;
+  announce(`Sweeping ${g?.area ?? 'the frame'} west to east over ${seconds} seconds${systems ? `, crossing ${systems} rain system${systems === 1 ? '' : 's'}` : ''}. Higher pitch means farther north; louder means more rain; a held pad is a rain system.`);
   if (sweepTimer) clearTimeout(sweepTimer);
   sweepTimer = setTimeout(() => set({ sweep: null }), seconds * 1000 + 400);
 }
@@ -545,6 +570,9 @@ export function setVisualRegion(regionId: string) {
 }
 export function setVisual(patch: Partial<ReturnType<typeof get>['visual']>) {
   set({ visual: { ...get().visual, ...patch } });
+  if (patch.roi != null || 'crop' in patch) set({ explore: null });
+  if (patch.crop) announce(`Sweep crop set: the sweep now reads only ${patch.crop.latMin}° to ${patch.crop.latMax}° latitude, ${patch.crop.lonMin}° to ${patch.crop.lonMax}° longitude.`);
+  else if ('crop' in patch && patch.crop === null) announce('Sweep crop cleared: the sweep reads the entire frame.');
   if (patch.roi != null) { void loadFrame(get().visual.day).catch(() => undefined); preloadFrames(get().visual.day); }
 }
 

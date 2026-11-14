@@ -12,6 +12,7 @@
 | Image-feature sonification | Delivered as **image-derived** values decoded from NASA's colorbar (r = 0.97 against the reconstruction). Always labelled approximate and kept separate from measurements. |
 | Sound against the normal (`rain-v2`) and the beat-based frame sweep (`scan-v2`) | Delivered and unit-tested. **Not yet judged by listeners** (balance of hum, chords and cues). |
 | Preset / Advanced mode | Delivered. Preset is the first-run default. |
+| Whole-frame sweep with rain systems and crop (`scan-v3`) | Delivered and unit-tested. **Not yet heard on speakers or checked in a browser.** |
 | Braille charts on refreshable displays | Implemented with Unicode braille. **Not verified on hardware.** |
 
 Other notes:

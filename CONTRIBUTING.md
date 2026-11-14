@@ -15,6 +15,7 @@ If the hooks are not active (`git config core.hooksPath` prints nothing), run `n
 - `main` is always deployable: it builds, its tests pass, and it matches what is on Vercel production.
 - Work on short-lived branches named `<area>/<short-description>`. For example: `data/full-archive-check`, `sound/hybrid-mode`, `ui/visual-feed-states`, `fix/seek-double-notes`.
 - Merge to `main` only after review (see below). Rebase or squash noisy WIP commits first.
+- Merge with a merge commit (`git merge --no-ff`), not a fast-forward, so each branch stays visible in `main`'s history. AI agents merge and push their own branches to `main` (see `CLAUDE.md`).
 
 ## Commits
 

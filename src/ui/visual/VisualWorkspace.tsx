@@ -15,7 +15,7 @@ import { FrameScore, useSweepProgress } from '../shared/FrameScore';
 import { set, useStore } from '../../state/store';
 import * as I from '../icons';
 import { MusicChart } from '../shared/MusicChart';
-import { Disclosure, InstrumentRow, LegendButton, MappingRows, MasterVolume, ModeTabs, PitchRange, ScaleRow, LayerLevels } from '../shared/SoundControls';
+import { Disclosure, ElementMutes, GeophonyMapping, InstrumentRow, LegendButton, MappingRows, MasterVolume, ModeBanner, ModeTabs, ModeTag, PitchRange, ScaleRow, LayerLevels } from '../shared/SoundControls';
 import { TimeSeriesGraph } from '../shared/TimeSeriesGraph';
 
 const PH_BOX = { lonMin: 116, lonMax: 127.5, latMin: 4.5, latMax: 21.5 };
@@ -364,9 +364,10 @@ function SoundStudio() {
   const media = useStore((s) => s.media);
   const link = useStore((s) => s.link);
   const linked = link.state === 'reconstructed';
+  const mode = useStore((s) => s.sound.mode);
   return (
-    <section className="panel" aria-labelledby="studio-title">
-      <div className="panel-head"><h2 className="panel-title" id="studio-title">Sound studio</h2></div>
+    <section className={`panel sound-mode-${mode}`} aria-labelledby="studio-title">
+      <div className="panel-head"><h2 className="panel-title" id="studio-title">Sound studio</h2><span className="spacer" /><ModeTag /></div>
       <div className="panel-body">
         <div className="field" style={{ gridTemplateColumns: '60px 1fr' }}>
           <span className="label">Source</span>
@@ -396,13 +397,15 @@ function SoundStudio() {
           </div>
         )}
         <div className="field" style={{ gridTemplateColumns: '80px 1fr' }}><span className="label">Sound mode</span><ModeTabs /></div>
-        <InstrumentRow />
-        <ScaleRow />
+        <div style={{ marginBottom: 10 }}><ModeBanner /></div>
+        {mode === 'musical' && <><InstrumentRow /><ScaleRow /></>}
         <Disclosure title="Mappings" defaultOpen>
-          <MappingRows compact />
+          {mode === 'musical' ? <MappingRows compact /> : <GeophonyMapping />}
         </Disclosure>
-        <PitchRange />
+        {mode === 'musical' && <PitchRange />}
         <MasterVolume />
+        <div className="dim" style={{ fontSize: 12 }}>Elements (click to mute)</div>
+        <ElementMutes />
         <div style={{ marginBottom: 8 }}><LegendButton /></div>
         <Disclosure title="Frame alignment" extra={<span className="chip" style={{ fontSize: 11 }}>{media.alignment ? `${media.alignment.dayRuns} days verified` : 'Use supplied frame-to-date list'}</span>}>
           {media.alignment ? (
@@ -426,9 +429,10 @@ function PresetSoundStudio() {
   const media = useStore((s) => s.media);
   const link = useStore((s) => s.link);
   const linked = link.state === 'reconstructed';
+  const soundMode = useStore((s) => s.sound.mode);
   return (
-    <section className="panel" aria-labelledby="studio-title">
-      <div className="panel-head"><h2 className="panel-title" id="studio-title">Sound</h2></div>
+    <section className={`panel sound-mode-${soundMode}`} aria-labelledby="studio-title">
+      <div className="panel-head"><h2 className="panel-title" id="studio-title">Sound</h2><span className="spacer" /><ModeTag /></div>
       <div className="panel-body">
         {media.state === 'ready' && !linked && (
           <div className="callout" style={{ marginBottom: 10 }}>

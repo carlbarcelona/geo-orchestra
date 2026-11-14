@@ -211,6 +211,22 @@ table.data tr.missing td { color: var(--text-3); }
 .dialog { background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px; width: min(620px, 100%); max-height: 88vh; overflow: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
 .dialog h2 { margin: 0; font-size: 17px; }
 .dialog .panel-body p { margin: 0 0 10px; color: var(--text-2); }
+.mode-banner { display: flex; gap: 10px; align-items: center; border-radius: 8px; padding: 8px 10px; border: 1px solid; transition: background 0.2s, border-color 0.2s; }
+.mode-banner.musical { border-color: rgba(167, 139, 250, 0.6); background: var(--note-soft); color: var(--note); }
+.mode-banner.geophony { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); }
+.mode-banner .mode-name { font-weight: 700; letter-spacing: 0.03em; }
+.mode-banner .mode-desc { font-size: 12px; color: var(--text-2); }
+.panel.sound-mode-musical { border-color: rgba(167, 139, 250, 0.55); box-shadow: inset 3px 0 0 var(--note); }
+.panel.sound-mode-geophony { border-color: var(--accent-line); box-shadow: inset 3px 0 0 var(--accent); }
+.panel.sound-mode-musical .seg button[aria-selected='true'] { background: var(--note-soft); color: var(--note); box-shadow: inset 0 0 0 1px var(--note); }
+.mode-tag { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; text-transform: none; }
+.mode-tag.musical { color: var(--note); }
+.mode-tag.geophony { color: var(--accent); }
+.mute-btn { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line-2); border-radius: 6px; background: transparent; color: var(--text-2); cursor: pointer; padding: 0; }
+.mute-btn.on { color: var(--danger); border-color: rgba(248, 113, 113, 0.6); background: var(--danger-soft); }
+.element-mutes { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.mute-chip { cursor: pointer; background: transparent; }
+.mute-chip.off { color: var(--danger); border-color: rgba(248, 113, 113, 0.6); text-decoration: line-through; }
 .legend-row { display: grid; grid-template-columns: 110px 1fr auto; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
 
 .toast { position: fixed; right: 16px; bottom: 50px; background: var(--panel-2); border: 1px solid var(--line-2); padding: 10px 14px; border-radius: 8px; max-width: 420px; z-index: 60; }

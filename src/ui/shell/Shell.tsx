@@ -7,6 +7,7 @@ import { SCAN } from '../../sound/frameScan';
 import { audition, openProject, saveProject, scanCurrent, setTab, setUiMode, stepBy, togglePlay, toggleLoop, type LegendKind } from '../../state/actions';
 import { set, useStore } from '../../state/store';
 import * as I from '../icons';
+import { ElementMutes } from '../shared/SoundControls';
 
 export function Header() {
   const ds = useStore((s) => s.dataset);
@@ -219,6 +220,9 @@ export function Dialogs() {
             Pitch = <b>latitude</b> (each note is a 2.5° band: C4 ≈ 2.5–5°N, the Philippines is about D4–D5) · loudness = <b>rain class</b> (light, moderate, heavy, very heavy) ·
             silence = <b>dry</b> · a sweep reads the <b>whole frame in {SCAN.global.beats} beats from west to east</b> (the ROI view: {SCAN.beats} beats, with a soft tick over the Philippine sector). In the whole-frame view the pitch table spans 60°S–60°N, so north is still higher. A <b>held pad</b> is a <b>rain system</b> (a connected area of heavy rain): it starts when the scan line reaches it and stops when the line leaves it; warm pad = tropical, darker horn = mid-latitude storm track. Press <span className="kbd">S</span> to hear the current frame.
           </p>
+          <h3 className="legend-h">4 · Elements in this mode</h3>
+          <p className="dim" style={{ fontSize: 12.5 }}>Turn an element off to hear the others on their own, in playback and in these examples. Its level is kept for when you turn it back on.</p>
+          <ElementMutes />
           <p style={{ marginTop: 10 }}>Sounds are designed mappings of satellite estimates, not recordings. Instrument and volume change the timbre and loudness only, never the underlying values.</p>
         </Dialog>
       )}

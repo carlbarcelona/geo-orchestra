@@ -9,7 +9,7 @@ import { applyListeningPreset, currentObservations, numericalEvents, quickStart,
 import { set, useStore } from '../../state/store';
 import * as I from '../icons';
 import { BrailleChart } from '../shared/BrailleChart';
-import { LegendButton, MasterVolume } from '../shared/SoundControls';
+import { LegendButton, MasterVolume, ModeTag } from '../shared/SoundControls';
 
 const REGION_BUTTONS = [
   { id: 'philippines', label: 'Philippines' }, { id: 'luzon', label: 'Luzon' }, { id: 'visayas', label: 'Visayas' }, { id: 'mindanao', label: 'Mindanao' },
@@ -151,10 +151,11 @@ export function PresetSoundPanel() {
   const events = useMemo(() => (ds && selection ? numericalEvents() : []), [ds, selection, eventsCache]); // eslint-disable-line react-hooks/exhaustive-deps
   const o = obs[cursor];
   const step = events[cursor] ?? [];
+  const soundMode = useStore((s) => s.sound.mode);
   const ctx = (step.find((e) => e.kind === 'melody') ?? step.find((e) => e.marker === 'missing') ?? step.find((e) => e.kind === 'reference'))?.context;
   return (
-    <section className="panel" aria-labelledby="psound-title">
-      <div className="panel-head"><h2 className="panel-title" id="psound-title"><I.Note size={18} /> Sound</h2></div>
+    <section className={`panel sound-mode-${soundMode}`} aria-labelledby="psound-title">
+      <div className="panel-head"><h2 className="panel-title" id="psound-title">{soundMode === 'musical' ? <I.Note size={18} /> : <I.Wave size={18} />} Sound</h2><span className="spacer" /><ModeTag /></div>
       <div className="panel-body">
         <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>How to listen</div>
         <ListeningPresetCards workspace="numerical" />

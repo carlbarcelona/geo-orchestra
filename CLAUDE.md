@@ -4,7 +4,11 @@ Follow [CONTRIBUTING.md](CONTRIBUTING.md). The most important rules:
 
 - **Never add `Co-Authored-By` or any other AI attribution line to commits or PR descriptions.** The commit-msg hook rejects them.
 - Run `npm run check` before committing. Never use `--no-verify`.
-- **Always finish by merging into `main` with a merge commit and pushing `main`.** Work on a `<area>/<short-description>` branch, then `git switch main && git pull --ff-only && git merge --no-ff <branch> && git push origin main` (push the branch too). This overrides the review-before-merge step in CONTRIBUTING.md for agent work.
+- **Who merges to `main` depends on who you are working for.** Check `git config user.name` first.
+  - **Anyone other than `jeflecias`:** work on a `<area>/<short-description>` branch and finish by pushing **only that branch** (`git push -u origin <branch>`). **Never merge into `main` and never push `main`.** Tell the user the branch name so `jeflecias` can gather it.
+  - **`jeflecias`:** gather teammates' pushed branches and your own into `main`, each with a merge commit, then push `main`: `git switch main && git pull --ff-only && git fetch && git merge --no-ff origin/<branch>` for each branch, `npm run check`, then `git push origin main`.
+  - **Why:** Vercel's Hobby plan only deploys commits whose git author is a member of the Vercel team, and that is `jeflecias` alone. A push to `main` whose newest commit someone else authored fails the deploy (`TEAM_ACCESS_REQUIRED`) and the live site stays behind.
+  - This overrides the review-before-merge step in CONTRIBUTING.md for agent work.
 - Do not hand-edit `public/data/**`. Regenerate it with the scripts in `pipeline/`.
 - Do not commit `data/raw/`, credentials (`_netrc`, `.env*`), or `pipeline/.venv`.
 - Missing measurements stay `null`, never `0`. The SVS climatology linkage is labelled **reconstructed**, not exact.

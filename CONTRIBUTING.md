@@ -15,7 +15,8 @@ If the hooks are not active (`git config core.hooksPath` prints nothing), run `n
 - `main` is always deployable: it builds, its tests pass, and it matches what is on Vercel production.
 - Work on short-lived branches named `<area>/<short-description>`. For example: `data/full-archive-check`, `sound/hybrid-mode`, `ui/visual-feed-states`, `fix/seek-double-notes`.
 - Merge to `main` only after review (see below). Rebase or squash noisy WIP commits first.
-- Merge with a merge commit (`git merge --no-ff`), not a fast-forward, so each branch stays visible in `main`'s history. AI agents merge and push their own branches to `main` (see `CLAUDE.md`).
+- Merge with a merge commit (`git merge --no-ff`), not a fast-forward, so each branch stays visible in `main`'s history.
+- **Only `jeflecias` pushes to `main`.** Everyone else pushes their branch and stops there; `jeflecias` gathers the branches into `main` with merge commits. Vercel's Hobby plan deploys only commits authored by a member of the Vercel team, so a `main` whose newest commit has another author is not deployed. See `CLAUDE.md` for the exact steps.
 
 ## Commits
 
@@ -57,7 +58,7 @@ Also run the app (`npm run dev`) and click through the flow you changed. A scree
 
 ## Deploying
 
-- Production deploys automatically: every push to `main` runs `.github/workflows/deploy-production.yml`, which runs `npm run check` and then deploys to Vercel production. If the checks fail, nothing is deployed. Watch it under the repository's Actions tab, or re-run it from there (`workflow_dispatch`).
+- Production deploys automatically: every push to `main` runs `.github/workflows/deploy-production.yml`, which runs `npm run check` and then deploys to Vercel production. If the checks fail, nothing is deployed. The deploy also fails with `TEAM_ACCESS_REQUIRED` if the newest commit on `main` was authored by someone outside the Vercel team; that is why only `jeflecias` pushes `main`. Watch it under the repository's Actions tab, or re-run it from there (`workflow_dispatch`).
 - The workflow needs a repository secret `VERCEL_TOKEN` (a Vercel access token with access to the `spacebigan` project). Only a repository admin can add it: Settings → Secrets and variables → Actions.
 - Preview: `vercel deploy`. A manual production deploy (`vercel deploy --prod`) is only for emergencies, from `main` only.
 - After deploying, load the NASA sample and the visual feed on the hosted URL, and check the status-bar `sync` reading on the demo machine.

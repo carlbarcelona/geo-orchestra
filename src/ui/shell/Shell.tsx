@@ -10,6 +10,7 @@ import { RESET_LAYOUT_EVENT, writeLayout } from './layout';
 import * as I from '../icons';
 import { ElementMutes } from '../shared/SoundControls';
 import { BriefingModal } from './BriefingModal';
+import { useTheme } from './theme';
 
 export function Header() {
   const ds = useStore((s) => s.dataset);
@@ -22,23 +23,46 @@ export function Header() {
   let status = '';
   if (tab === 'numerical') status = load.state === 'loading' ? 'Loading…' : !ds ? 'Before import' : ds.kind === 'synthetic' ? 'SYNTHETIC DEMO · not NASA data' : ds.kind === 'nasa' ? `NASA IMERG V07B · ${ds.months.length} months` : 'Imported file';
   else status = media.state !== 'ready' ? 'Media not loaded' : link.state === 'reconstructed' ? 'NASA SVS frames · reconstructed linkage' : 'NASA SVS frames · measurements not connected';
+  const live = tab === 'numerical' ? !!ds : media.state === 'ready';
   return (
     <header className="header">
       <div className="brand">
         <I.Logo />
-        <div><div className="brand-name">GeoOrchestra</div><div className="brand-sub">Earth Information Jukebox</div></div>
+        <div className="brand-text">
+          <div className="brand-name">GeoOrchestra</div>
+          <div className="brand-sub">Earth Information Jukebox</div>
+        </div>
       </div>
-      <div className="header-divider" />
-      <div className="project-title"><I.Folder /> Philippines · Rainfall</div>
+      <div className="header-divider hide-md" />
+      <div className="project-pill hide-md">
+        <span className="project-name">Philippines · Rainfall</span>
+      </div>
       <span className="spacer" />
-      <span className={`header-status ${ds?.kind === 'synthetic' && tab === 'numerical' ? 'synthetic' : ''}`} role="status">{status}</span>
-      <button className="btn" onClick={saveProject}><I.Save /> Save project</button>
-      <button className="btn" onClick={() => openRef.current?.click()}><I.Open /> Open</button>
-      <input ref={openRef} type="file" accept=".json,application/json" hidden aria-label="Open project file"
-        onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setToast(await openProject(f)); }} />
-      <button className="btn access" onClick={() => set({ dialogs: { ...useStore.getState().dialogs, a11y: true } })}><I.Access /> Accessibility</button>
+      <span className={`header-status ${ds?.kind === 'synthetic' && tab === 'numerical' ? 'synthetic' : ''} ${live ? 'live' : ''}`} role="status">
+        <span className="status-dot" aria-hidden="true" />
+        <span className="status-text">{status}</span>
+      </span>
+      <div className="header-dock" role="toolbar" aria-label="Project and display controls">
+        <button className="dock-btn" onClick={saveProject} aria-label="Save project" title="Save project"><I.Save size={15} /><span className="btn-label">Save</span></button>
+        <button className="dock-btn" onClick={() => openRef.current?.click()} aria-label="Open project" title="Open project"><I.Open size={15} /><span className="btn-label">Open</span></button>
+        <input ref={openRef} type="file" accept=".json,application/json" hidden aria-label="Open project file"
+          onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setToast(await openProject(f)); }} />
+        <span className="dock-sep" aria-hidden="true" />
+        <button className="dock-btn dock-accent" onClick={() => set({ dialogs: { ...useStore.getState().dialogs, a11y: true } })} aria-label="Accessibility" title="Accessibility"><I.Access size={15} /><span className="btn-label">Accessibility</span></button>
+        <ThemeToggle />
+      </div>
       {toast && <div className="toast" role="status"><div className="row"><b>Project</b><span className="spacer" /><button className="btn small ghost" onClick={() => setToast(null)} aria-label="Dismiss"><I.X /></button></div>{toast.map((t) => <div key={t} className="dim" style={{ fontSize: 12.5 }}>{t}</div>)}</div>}
     </header>
+  );
+}
+
+function ThemeToggle() {
+  const [theme, toggle] = useTheme();
+  const next = theme === 'dark' ? 'light' : 'dark';
+  return (
+    <button className="dock-btn dock-icon" onClick={toggle} aria-label={`Switch to ${next} mode`} title={`Switch to ${next} mode`}>
+      {theme === 'dark' ? <I.Sun size={15} /> : <I.Moon size={15} />}
+    </button>
   );
 }
 
@@ -54,7 +78,8 @@ export function SubBar() {
         <button role="tab" className="ws-tab" aria-selected={tab === 'numerical'} onClick={() => setTab('numerical')}>Numerical</button>
         <button role="tab" className="ws-tab" aria-selected={tab === 'visual'} onClick={() => setTab('visual')}>Visual feed</button>
       </div>
-      <div className="header-divider" style={{ height: 22 }} />
+      <div className="header-divider hide-sm" style={{ height: 22 }} />
+      <div className="subbar-chips">
       {tab === 'numerical' ? (
         <>
           <span className="chip"><I.Rain size={14} /> IMERG Monthly V07B</span>
@@ -68,6 +93,7 @@ export function SubBar() {
           {media.state === 'ready' && <span className={`chip ${link.state === 'reconstructed' ? 'amber' : ''}`}>{link.state === 'reconstructed' ? 'Linkage: reconstructed (approximate)' : 'Linkage: not connected'}</span>}
         </>
       )}
+      </div>
       <span className="spacer" />
       <ModeSwitch />
     </nav>
@@ -102,8 +128,8 @@ export function StatusBar() {
   return (
     <footer className="statusbar">
       <I.Info />
-      {tab === 'numerical' ? <span>One clock · Table · Map · Graph · audio · chart follow the same observation</span>
-        : <span>Media: {media.state === 'ready' ? 'Imported' : 'Not imported'} · Numerical link: {link.state === 'reconstructed' ? 'Reconstructed' : 'Not connected'}</span>}
+      {tab === 'numerical' ? <span className="status-msg">One clock · Table · Map · Graph · audio · chart follow the same observation</span>
+        : <span className="status-msg">Media: {media.state === 'ready' ? 'Imported' : 'Not imported'} · Numerical link: {link.state === 'reconstructed' ? 'Reconstructed' : 'Not connected'}</span>}
       {playback === 'stopped' && pauseReason && ['page hidden', 'end of range', 'audio unavailable', 'a NASA frame failed to load'].includes(pauseReason) && <span className="chip" style={{ fontSize: 11 }}>{pauseReason}</span>}
       <span className="spacer" />
       <span className="hide-sm"><span className="kbd">Space</span> Play/Pause · <span className="kbd">L</span> Loop · <span className="kbd">C</span> Checkpoint · <span className="kbd">←</span><span className="kbd">→</span> Step</span>

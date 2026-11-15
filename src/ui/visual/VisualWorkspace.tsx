@@ -160,7 +160,7 @@ function PresetNasaPanel() {
       <div className="panel-head"><h2 className="panel-title" id="nasa-title">NASA rainfall animation</h2></div>
       <div className="panel-body">
         <div className={`dataset-card ${ready ? '' : 'empty'}`} style={{ marginBottom: 10 }}>
-          <I.Video style={{ marginTop: 2 }} />
+          <I.Video style={{ marginTop: 2, flexShrink: 0 }} />
           <div className="grow">
             <div className="t">IMERG daily climatology</div>
             <div className="s">NASA SVS 5478 · the average year, 2001–2022</div>
@@ -535,11 +535,12 @@ function PresetSoundStudio() {
               <div className="txt">The sound uses daily values rebuilt from monthly NASA measurements (2001–2022), not the exact data behind the frames.</div></div>
           </div>
         )}
-        <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>How to listen</div>
+        <div className="preset-label">How to listen</div>
         <ListeningPresetCards workspace="visual" />
+        <div className="preset-label">Volume &amp; help</div>
         <MasterVolume />
         <NarrationToggle />
-        <div style={{ marginBottom: 8 }}><LegendButton /></div>
+        <div className="legend-actions"><LegendButton /></div>
         <p className="muted" style={{ fontSize: 11.5 }}>Press <span className="kbd">S</span> to hear the whole frame as {SCAN.global.beats} beats from west to east (the ROI view sweeps {SCAN.beats} beats). Rain systems light up as the line crosses them.</p>
       </div>
     </section>

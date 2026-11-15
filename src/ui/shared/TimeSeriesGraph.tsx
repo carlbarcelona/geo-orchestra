@@ -86,7 +86,7 @@ export function TimeSeriesGraph({ points, cursor, range, onSelect, yLabel, kind 
         onMouseMove={(e) => setHover(pick(e))} onMouseLeave={() => setHover(null)} onClick={(e) => onSelect?.(pick(e))}>
         <g className="grid">{yTicks.map((t) => <line key={t} x1={m.l} x2={W - m.r} y1={y(t)} y2={y(t)} />)}</g>
         {range && n > 1 && (range[0] > 0 || range[1] < n - 1) && (
-          <rect x={x(range[0])} y={m.t} width={Math.max(2, x(range[1]) - x(range[0]))} height={H - m.t - m.b} fill="rgba(45,212,191,0.07)" />
+          <rect x={x(range[0])} y={m.t} width={Math.max(2, x(range[1]) - x(range[0]))} height={H - m.t - m.b} fill="var(--accent-soft)" />
         )}
         <g className="axis">
           {yTicks.map((t) => <text key={t} x={m.l - 6} y={y(t) + 3.5} textAnchor="end">{t}</text>)}
@@ -95,25 +95,25 @@ export function TimeSeriesGraph({ points, cursor, range, onSelect, yLabel, kind 
           <text transform={`translate(13 ${(H - m.b + m.t) / 2}) rotate(-90)`} textAnchor="middle" style={{ fontFamily: 'var(--font)' }}>{yLabel}</text>
         </g>
         {kind === 'line' && refPath.gaps.map((g, k) => <path key={`g${k}`} d={g.d} fill={g.wet ? 'rgba(56,189,248,0.22)' : 'rgba(251,146,60,0.22)'} stroke="none" />)}
-        {refPath.line && <path d={refPath.line} fill="none" stroke="#e6eef5" strokeOpacity={0.7} strokeWidth={1.2} strokeDasharray="4 3" />}
+        {refPath.line && <path d={refPath.line} fill="none" stroke="var(--text)" strokeOpacity={0.65} strokeWidth={1.2} strokeDasharray="4 3" />}
         {kind === 'bars'
           ? points.map((p, i) => p.value == null ? null : <rect key={i} x={x(i) - barW / 2} y={y(p.value)} width={barW} height={H - m.b - y(p.value)} fill={color} opacity={0.75} />)
           : segments.map((d, k) => <path key={k} d={d} fill="none" stroke={color} strokeWidth={n > 150 ? 1.3 : 2} />)}
         {kind === 'line' && n <= 40 && points.map((p, i) => p.value == null ? null : <circle key={i} cx={x(i)} cy={y(p.value)} r={3} fill={color} />)}
-        {points.map((p, i) => p.value == null ? <g key={`m${i}`}><line x1={x(i)} x2={x(i)} y1={m.t} y2={H - m.b} stroke="#f87171" strokeDasharray="3 3" opacity={0.6} /><text x={x(i)} y={m.t + 10} fill="#f87171" fontSize={10} textAnchor="middle">missing</text></g> : null)}
+        {points.map((p, i) => p.value == null ? <g key={`m${i}`}><line x1={x(i)} x2={x(i)} y1={m.t} y2={H - m.b} stroke="var(--danger)" strokeDasharray="3 3" opacity={0.6} /><text x={x(i)} y={m.t + 10} fill="var(--danger)" fontSize={10} textAnchor="middle">missing</text></g> : null)}
         {marks?.map((mk) => (
           <g key={`cp${mk.index}`} aria-hidden="true">
-            <line x1={x(mk.index)} x2={x(mk.index)} y1={m.t} y2={H - m.b} stroke="#fbbf24" strokeDasharray="2 3" strokeWidth={1.2} />
-            <text x={x(mk.index) + 3} y={m.t + 22} fill="#fde68a" fontSize={10}>⚑ {mk.label.slice(0, 14)}</text>
+            <line x1={x(mk.index)} x2={x(mk.index)} y1={m.t} y2={H - m.b} stroke="var(--amber)" strokeDasharray="2 3" strokeWidth={1.2} />
+            <text x={x(mk.index) + 3} y={m.t + 22} fill="var(--cp)" fontSize={10}>⚑ {mk.label.slice(0, 14)}</text>
           </g>
         ))}
         {cp && (
           <g>
-            <line x1={x(cursor)} x2={x(cursor)} y1={m.t} y2={H - m.b} stroke="#f5b942" strokeWidth={1.5} />
-            {cp.value != null && <circle cx={x(cursor)} cy={y(cp.value)} r={5.5} fill="#f5b942" stroke="#0b1622" strokeWidth={1.5} />}
+            <line x1={x(cursor)} x2={x(cursor)} y1={m.t} y2={H - m.b} stroke="var(--amber)" strokeWidth={1.5} />
+            {cp.value != null && <circle cx={x(cursor)} cy={y(cp.value)} r={5.5} fill="var(--amber)" stroke="var(--panel)" strokeWidth={1.5} />}
           </g>
         )}
-        {hp && hover != null && <line x1={x(hover)} x2={x(hover)} y1={m.t} y2={H - m.b} stroke="rgba(255,255,255,0.35)" />}
+        {hp && hover != null && <line x1={x(hover)} x2={x(hover)} y1={m.t} y2={H - m.b} stroke="var(--text-3)" />}
       </svg>
       {reference && (
         <div className="graph-key" aria-hidden="true">

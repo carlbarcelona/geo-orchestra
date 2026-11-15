@@ -12,7 +12,8 @@ import { BrailleChart } from '../shared/BrailleChart';
 import { LegendButton, MasterVolume, ModeTag } from '../shared/SoundControls';
 
 const REGION_BUTTONS = [
-  { id: 'philippines', label: 'Philippines' }, { id: 'luzon', label: 'Luzon' }, { id: 'visayas', label: 'Visayas' }, { id: 'mindanao', label: 'Mindanao' },
+  { id: 'philippines', label: 'Philippines', hint: 'Whole country' }, { id: 'luzon', label: 'Luzon', hint: 'North' },
+  { id: 'visayas', label: 'Visayas', hint: 'Central' }, { id: 'mindanao', label: 'Mindanao', hint: 'South' },
 ];
 
 const CATEGORY_CLASS: Record<string, string> = { 'much-wetter': 'wet2', wetter: 'wet1', 'near-normal': 'near', drier: 'dry1', 'much-drier': 'dry2' };
@@ -88,14 +89,14 @@ export function ListeningGuide({ workspace }: { workspace: 'numerical' | 'visual
       ];
   return (
     <div className="section listening-guide">
-      <div className="section-head" style={{ fontSize: 12 }}><I.Note size={14} /> What you hear</div>
+      <div className="section-head"><I.Note size={14} /> What you hear</div>
       <dl className="section-body guide-list">
         {(items.filter(Boolean) as string[][]).map(([k, v]) => <div key={k} className="guide-row"><dt>{k}</dt><dd>{v}</dd></div>)}
         <div className="guide-row">
           <dt>Knock</dt>
           <dd>
             a new {workspace === 'numerical' ? 'year' : 'month'} begins; a <b>double knock</b> is your checkpoint (press C to set one)
-            <span className="row" style={{ marginTop: 3 }}>
+            <span className="row" style={{ marginTop: 6, flexWrap: 'wrap' }}>
               <button className="btn small" onClick={() => auditionCue('period')} aria-label="Preview the time cue"><I.Play size={11} /> knock</button>
               <button className="btn small" onClick={() => auditionCue('checkpoint')} aria-label="Preview the checkpoint cue"><I.Play size={11} /> double knock</button>
             </span>
@@ -106,54 +107,86 @@ export function ListeningGuide({ workspace }: { workspace: 'numerical' | 'visual
   );
 }
 
-/** Preset left panel: one-click start, then simple region buttons and the listening guide. */
+/** Preset left panel: a three-step path (load → choose a place → listen), then the listening guide. */
 export function StartPanel() {
   const ds = useStore((s) => s.dataset);
   const load = useStore((s) => s.load);
   const selection = useStore((s) => s.selection);
   const loading = load.state === 'loading';
+  const ready = !!ds && ds.kind === 'nasa';
+  const regions = ready ? REGION_BUTTONS.filter((r) => ds.regions.some((x) => x.id === r.id)) : REGION_BUTTONS;
   return (
-    <section className="panel" aria-labelledby="start-title">
-      <div className="panel-head"><h2 className="panel-title" id="start-title"><I.Layers size={18} /> {ds ? 'Listen' : 'Start here'}</h2></div>
+    <section className="panel preset-start" aria-labelledby="start-title">
+      <div className="panel-head"><h2 className="panel-title" id="start-title"><I.Layers size={18} /> {ready ? 'Listen' : 'Start here'}</h2></div>
       <div className="panel-body">
-        {!ds || ds.kind !== 'nasa' ? (
-          <div className="welcome-card">
-            <div className="welcome-title">Hear 25 years of Philippine rainfall</div>
-            <p className="dim" style={{ margin: '4px 0 10px', fontSize: 12.5 }}>
-              NASA satellite measurements (IMERG), one month per second from June 2000 to December 2024. You will hear each month compared with a normal month.
-            </p>
-            <button className="btn primary solid big" onClick={() => void quickStart()} disabled={loading}><I.Play /> {loading ? 'Loading…' : 'Start listening'}</button>
-            {loading && (
-              <div style={{ marginTop: 8 }} role="status" aria-live="polite">
-                <div className="progress"><div style={{ width: `${Math.round(load.progress * 100)}%` }} /></div>
-                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{load.message}</div>
-              </div>
-            )}
-            {load.errors.length > 0 && <div className="callout danger" style={{ marginTop: 8 }} role="alert"><I.Warn /><div className="txt">{load.message} {load.errors[0]}</div></div>}
-            {ds?.kind === 'synthetic' && <p className="muted" style={{ fontSize: 12 }}>The synthetic demo is loaded (not NASA data). Start listening replaces it with the NASA sample.</p>}
-          </div>
-        ) : (
-          <>
-            <div className="dataset-card" style={{ marginBottom: 10 }}>
-              <I.Check style={{ color: 'var(--accent)', marginTop: 2 }} />
-              <div className="grow"><div className="t">NASA IMERG rainfall</div><div className="s">{ds.months.length} months · {monthLabel(ds.months[0])} – {monthLabel(ds.months[ds.months.length - 1])}</div></div>
+        <ol className="steps">
+          <li className={`step ${ready ? 'done' : 'current'}`}>
+            <span className="step-idx" aria-hidden="true">{ready ? <I.Check size={14} /> : '01'}</span>
+            <div className="step-main">
+              {!ready ? (
+                <div className="welcome-card">
+                  <div className="eyebrow">Step 1 · Load the record</div>
+                  <div className="welcome-title">Hear 25 years of Philippine rainfall</div>
+                  <p className="welcome-text">
+                    NASA satellite measurements (IMERG), one month per second from June 2000 to December 2024. You will hear each month compared with a normal month.
+                  </p>
+                  <dl className="stat-row">
+                    <div><dt>Span</dt><dd>25<small>yrs</small></dd></div>
+                    <div><dt>Tempo</dt><dd>1<small>mo/s</small></dd></div>
+                    <div><dt>Source</dt><dd>IMERG</dd></div>
+                  </dl>
+                  <button className="btn primary solid big" onClick={() => void quickStart()} disabled={loading}><I.Play /> {loading ? 'Loading…' : 'Start listening'}</button>
+                  {loading && (
+                    <div style={{ marginTop: 10 }} role="status" aria-live="polite">
+                      <div className="progress"><div style={{ width: `${Math.round(load.progress * 100)}%` }} /></div>
+                      <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{load.message}</div>
+                    </div>
+                  )}
+                  {load.errors.length > 0 && <div className="callout danger" style={{ marginTop: 8 }} role="alert"><I.Warn /><div className="txt">{load.message} {load.errors[0]}</div></div>}
+                  {ds?.kind === 'synthetic' && <p className="muted" style={{ fontSize: 12, margin: '8px 0 0' }}>The synthetic demo is loaded (not NASA data). Start listening replaces it with the NASA sample.</p>}
+                </div>
+              ) : (
+                <>
+                  <div className="step-title">Rainfall record loaded</div>
+                  <div className="dataset-card">
+                    <div className="grow"><div className="t">NASA IMERG rainfall</div><div className="s mono">{ds.months.length} months · {monthLabel(ds.months[0])} – {monthLabel(ds.months[ds.months.length - 1])}</div></div>
+                  </div>
+                </>
+              )}
             </div>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 4 }} id="region-buttons-label">Where?</div>
-            <div className="region-buttons" role="radiogroup" aria-labelledby="region-buttons-label">
-              {REGION_BUTTONS.filter((r) => ds.regions.some((x) => x.id === r.id)).map((r) => (
-                <button key={r.id} role="radio" aria-checked={selection?.regionId === r.id} className={`btn ${selection?.regionId === r.id ? 'active' : ''}`} onClick={() => selectRegion(r.id)}>{r.label}</button>
-              ))}
+          </li>
+          <li className={`step ${ready ? 'current' : 'locked'}`}>
+            <span className="step-idx" aria-hidden="true">02</span>
+            <div className="step-main">
+              <div className="step-title" id="region-buttons-label">Choose a place</div>
+              {ready ? (
+                <div className="region-buttons" role="radiogroup" aria-labelledby="region-buttons-label">
+                  {regions.map((r) => (
+                    <button key={r.id} role="radio" aria-checked={selection?.regionId === r.id} className={`region-tile ${selection?.regionId === r.id ? 'on' : ''}`} onClick={() => selectRegion(r.id)}>
+                      <span className="region-name">{r.label}</span>
+                      <span className="region-hint">{r.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : <div className="step-note">Available once the record is loaded.</div>}
+              {selection?.type === 'cell' && <p className="step-note">Listening to a single map cell: {selection.label}.</p>}
             </div>
-            {selection?.type === 'cell' && <p className="muted" style={{ fontSize: 12 }}>Listening to a single map cell: {selection.label}.</p>}
-          </>
-        )}
+          </li>
+          <li className={`step ${ready ? 'current' : 'locked'}`}>
+            <span className="step-idx" aria-hidden="true">03</span>
+            <div className="step-main">
+              <div className="step-title">Press play</div>
+              <div className="step-note">Use <I.Play size={11} /> under the music chart, or press <span className="kbd">Space</span>. A short spoken briefing introduces each sound first.</div>
+            </div>
+          </li>
+        </ol>
         <ListeningGuide workspace="numerical" />
       </div>
     </section>
   );
 }
 
-/** Preset right panel: how to listen, volume, legend, and the current month in words. */
+/** Preset right panel: the current month in words first, then how to listen, volume and the legend. */
 export function PresetSoundPanel() {
   const ds = useStore((s) => s.dataset);
   const selection = useStore((s) => s.selection);
@@ -169,24 +202,31 @@ export function PresetSoundPanel() {
     <section className={`panel sound-mode-${soundMode}`} aria-labelledby="psound-title">
       <div className="panel-head"><h2 className="panel-title" id="psound-title">{soundMode === 'musical' ? <I.Note size={18} /> : <I.Wave size={18} />} Sound</h2><span className="spacer" /><ModeTag /></div>
       <div className="panel-body">
-        <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>How to listen</div>
-        <ListeningPresetCards workspace="numerical" />
-        <MasterVolume />
-        <NarrationToggle />
-        <div style={{ marginBottom: 10 }}><LegendButton /></div>
-        {o && (
+        {o ? (
           <div className={`now-card ${ctx?.category ? CATEGORY_CLASS[ctx.category] : ''}`} aria-live="off">
-            <div className="now-when">{monthLabel(o.t, true)} · {selection?.label?.split(' (')[0]}</div>
+            <div className="now-when"><span className="eyebrow">Now</span> {monthLabel(o.t, true)} · {selection?.label?.split(' (')[0]}</div>
             <div className="now-headline">{o.value == null ? 'Measurement missing' : categoryHeadline(ctx) || `${o.value.toFixed(3)} mm/hr`}</div>
+            {o.value != null && <div className="now-value"><span className="mono">{o.value.toFixed(3)}</span><small>mm/hr</small></div>}
             <div className="now-detail">
               {o.value == null ? 'No note is played and no value is invented.' : <>
-                <b className="mono">{o.value.toFixed(3)}</b> mm/hr (≈ {(o.value * 24).toFixed(1)} mm/day)
+                ≈ {(o.value * 24).toFixed(1)} mm/day
                 {ctx?.normal != null && <> · normal {ctx.normal.toFixed(3)}</>}
                 {ctx && rankPhrase(ctx) && <> · {rankPhrase(ctx)}</>}
               </>}
             </div>
           </div>
+        ) : (
+          <div className="now-card idle">
+            <div className="now-when"><span className="eyebrow">Now</span></div>
+            <div className="now-detail">Nothing playing yet. Once the record is loaded, this card describes the current month in plain words.</div>
+          </div>
         )}
+        <div className="preset-label">How to listen</div>
+        <ListeningPresetCards workspace="numerical" />
+        <div className="preset-label">Volume &amp; help</div>
+        <MasterVolume />
+        <NarrationToggle />
+        <div className="legend-actions"><LegendButton /></div>
         {o && (
           <BrailleChart title={`${selection?.label ?? ''} · all months`} values={obs.map((x) => x.value)} index={cursor}
             summary={`${obs.length} months. Lowest ${Math.min(...obs.map((x) => x.value ?? 99)).toFixed(3)}, highest ${Math.max(...obs.map((x) => x.value ?? 0)).toFixed(3)} mm/hr; the pointer line marks ${o.t}.`} />

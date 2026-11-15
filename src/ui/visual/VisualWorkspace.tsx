@@ -17,6 +17,7 @@ import * as I from '../icons';
 import { MusicChart } from '../shared/MusicChart';
 import { Disclosure, ElementMutes, GeophonyMapping, InstrumentRow, LegendButton, MappingRows, MasterVolume, ModeBanner, ModeTabs, ModeTag, PitchRange, ScaleRow, LayerLevels, TimeCueControls } from '../shared/SoundControls';
 import { TimeSeriesGraph } from '../shared/TimeSeriesGraph';
+import { ResizeHandles } from '../shell/Splitter';
 
 const PH_BOX = { lonMin: 116, lonMax: 127.5, latMin: 4.5, latMax: 21.5 };
 const REGION_NAMES: Record<string, string> = { philippines: 'Philippines', luzon: 'Luzon', visayas: 'Visayas', mindanao: 'Mindanao' };
@@ -43,6 +44,7 @@ export function VisualWorkspace() {
   const preset = useStore((s) => s.uiMode === 'preset');
   return (
     <main id="main" className={`workspace visual ${preset ? 'preset' : ''}`} aria-label="Visual feed workspace">
+      <ResizeHandles workspace="visual" edges={[{ edge: 'left', className: 'sp-c2 sp-rall' }, { edge: 'right', className: 'sp-c3 sp-r1' }, { edge: 'top', className: 'sp-r2' }]} />
       <NasaDataPanel preset={preset} />
       <VisualFeed preset={preset} />
       {preset ? <PresetSoundStudio /> : <SoundStudio />}

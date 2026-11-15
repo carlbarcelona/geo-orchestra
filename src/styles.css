@@ -100,14 +100,41 @@ a { color: var(--accent); }
 .chip.ok { border-color: rgba(74, 222, 128, 0.5); color: var(--ok); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; }
 
-.workspace { min-height: 0; overflow: auto; padding: 10px; display: grid; gap: 10px; }
-.workspace.numerical { grid-template-columns: 300px minmax(420px, 1fr) 330px; grid-template-rows: minmax(400px, 1fr) minmax(300px, 0.85fr); }
-.workspace.visual { grid-template-columns: 320px minmax(460px, 1fr) 350px; grid-template-rows: minmax(430px, 1.2fr) minmax(290px, 0.8fr); }
+.workspace { min-height: 0; overflow: auto; padding: 10px; display: grid; gap: 10px; position: relative; }
+/* --cols / --rows are set by the splitters (src/ui/shell/Splitter.tsx); unset = these defaults */
+.workspace.numerical { grid-template-columns: var(--cols, 300px minmax(420px, 1fr) 330px); grid-template-rows: var(--rows, minmax(400px, 1fr) minmax(300px, 0.85fr)); }
+.workspace.visual { grid-template-columns: var(--cols, 320px minmax(460px, 1fr) 350px); grid-template-rows: var(--rows, minmax(430px, 1.2fr) minmax(290px, 0.8fr)); }
+
+/* ---------- Splitters: absolutely positioned grid children, so they sit in the gaps and take no cell.
+   Give both grid lines: for an absolutely positioned item a missing end line means the container edge. ---------- */
+.splitter { position: absolute; z-index: 5; display: flex; align-items: center; justify-content: center; touch-action: none; outline-offset: -2px; }
+.splitter-col { left: -10px; width: 10px; top: 0; bottom: 0; cursor: col-resize; }
+.splitter-row { top: -10px; height: 10px; left: 0; right: 0; cursor: row-resize; }
+.splitter.sp-c2 { grid-column: 2 / 3; }
+.splitter.sp-c3 { grid-column: 3 / 4; }
+.splitter.sp-r1 { grid-row: 1 / 2; }
+.splitter.sp-r2 { grid-row: 2 / 3; grid-column: 1 / -1; }
+.splitter.sp-rall { grid-row: 1 / -1; }
+.splitter-grip { border-radius: 3px; background: var(--line-2); opacity: 0; transition: opacity 0.12s, background 0.12s; }
+.splitter-col .splitter-grip { width: 4px; height: 44px; }
+.splitter-row .splitter-grip { height: 4px; width: 56px; }
+.workspace:hover .splitter-grip { opacity: 0.6; }
+.splitter:hover .splitter-grip, .splitter:focus-visible .splitter-grip { opacity: 1; background: var(--accent); }
+body.resizing-col, body.resizing-col * { cursor: col-resize !important; user-select: none; }
+body.resizing-row, body.resizing-row * { cursor: row-resize !important; user-select: none; }
+body.resizing-col .splitter-grip, body.resizing-row .splitter-grip { opacity: 1; }
+/* a narrow panel (dragged small) stacks label above control, so every select shows its whole value */
+@container (max-width: 330px) {
+  .field { grid-template-columns: 1fr !important; gap: 3px; }
+  .field select, .field .seg { width: 100%; }
+  .legend-row { grid-template-columns: 1fr auto; }
+  .legend-row > span { grid-column: 1 / -1; grid-row: 2; }
+}
 .span-all { grid-column: 1 / -1; }
 .span-2 { grid-column: 2 / -1; }
 
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
-.panel-head { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); min-height: 44px; }
+.panel { container-type: inline-size; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+.panel-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); min-height: 44px; }
 .panel-title { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; margin: 0; display: flex; align-items: center; gap: 8px; }
 .panel-body { padding: 10px 12px; overflow-y: auto; overflow-x: hidden; min-height: 0; flex: 1; }
 .panel-foot { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--text-2); flex-wrap: wrap; }
@@ -143,7 +170,11 @@ a { color: var(--accent); }
 .field label, .field .label { color: var(--text-2); }
 .field > * { min-width: 0; }
 .field .chip { white-space: normal; }
-select { max-width: 100%; }
+select { max-width: 100%; min-width: 4.5em; text-overflow: ellipsis; }
+/* the open option list must stay readable on every platform (Windows draws it with the select's colours) */
+option, optgroup { background: var(--panel-2); color: var(--text); }
+option:checked { background: var(--accent-soft); color: var(--text); }
+:root[data-contrast='high'] option { background: #000; color: #fff; }
 select, input[type='text'], input[type='search'] { background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 6px; padding: 5px 8px; min-width: 0; }
 input[type='range'] { accent-color: var(--accent); width: 100%; }
 input[type='checkbox'] { accent-color: var(--accent); }
@@ -290,6 +321,7 @@ table.data tr.missing td { color: var(--text-3); }
 @media (max-width: 1180px) {
   .workspace.numerical, .workspace.visual { grid-template-columns: 1fr 1fr; grid-template-rows: none; grid-auto-rows: minmax(340px, auto); }
   .workspace .main-panel { grid-column: 1 / -1; order: -1; }
+  .splitter { display: none; }
   .span-2 { grid-column: 1 / -1; }
 }
 @media (max-width: 720px) {

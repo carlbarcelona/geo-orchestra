@@ -10,6 +10,7 @@ import { MusicChart } from './ui/shared/MusicChart';
 import { Dialogs, Header, LiveRegion, StatusBar, SubBar, useShortcuts } from './ui/shell/Shell';
 import { VisualWorkspace } from './ui/visual/VisualWorkspace';
 import { ErrorBoundary } from './ui/shell/ErrorBoundary';
+import { ResizeHandles } from './ui/shell/Splitter';
 import { PresetSoundPanel, StartPanel } from './ui/preset/PresetPanels';
 
 const MONTH_SPEEDS = [
@@ -32,6 +33,7 @@ function NumericalWorkspace() {
   const preset = useStore((s) => s.uiMode === 'preset');
   return (
     <main id="main" className={`workspace numerical ${preset ? 'preset' : ''}`} aria-label="Numerical workspace">
+      <ResizeHandles workspace="numerical" edges={[{ edge: 'left', className: 'sp-c2 sp-r1' }, { edge: 'right', className: 'sp-c3 sp-r1' }, { edge: 'top', className: 'sp-r2' }]} />
       {preset ? <StartPanel /> : <ProjectPanel />}
       <DatasetPanel simple={preset} />
       {preset ? <PresetSoundPanel /> : <SoundPanel />}

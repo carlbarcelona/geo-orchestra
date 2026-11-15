@@ -81,7 +81,7 @@ export function TimeSeriesGraph({ points, cursor, range, onSelect, yLabel, kind 
   const cp = points[cursor];
   const barW = Math.max(1, (W - m.l - m.r) / Math.max(1, n) - 1);
   return (
-    <div ref={ref} style={{ position: 'relative', width: '100%', height: '100%', minHeight: 140 }}>
+    <div ref={ref} style={{ position: 'relative', width: '100%', height: '100%', minHeight: 140, overflow: 'hidden' }}>
       <svg className="graph" width={W} height={H} role="img" aria-label={describe}
         onMouseMove={(e) => setHover(pick(e))} onMouseLeave={() => setHover(null)} onClick={(e) => onSelect?.(pick(e))}>
         <g className="grid">{yTicks.map((t) => <line key={t} x1={m.l} x2={W - m.r} y1={y(t)} y2={y(t)} />)}</g>

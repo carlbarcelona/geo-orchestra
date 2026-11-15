@@ -87,12 +87,14 @@ export function MusicChart(p: Props) {
       const ctx = cv.getContext('2d')!;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
-      const left = 128, keysW = 30, top = 48, bottom = 6;
-      const plotX = left + keysW, plotW = W - plotX - 12;
+      const compact = W < 560;
+      const left = compact ? 76 : 128, keysW = compact ? 18 : 30, top = 48, bottom = 6;
+      const plotX = left + keysW, plotW = Math.max(80, W - plotX - 10);
       const laneTex = 34, laneMark = 26, gap = 6;
       const pitchH = Math.max(60, H - top - bottom - laneTex - laneMark - gap * 2);
       const texY = top + pitchH + gap, markY = texY + laneTex + gap;
-      const V = Math.min(p.visibleSteps, Math.max(1, n));
+      const visCap = compact ? Math.min(5, p.visibleSteps) : W < 760 ? Math.min(8, p.visibleSteps) : p.visibleSteps;
+      const V = Math.min(visCap, Math.max(1, n));
       const prog = playback === 'playing' && !reduced ? controller.progress() : 0;
       const head = p.cursor + prog;
       let first = Math.max(0, Math.min(n - V, head - Math.floor(V * 0.25)));
@@ -121,28 +123,38 @@ export function MusicChart(p: Props) {
         wet: WET, dry: DRY, zero: '#f5b942', year: '#a78bfa',
       };
 
-      ctx.font = '12px Inter, sans-serif';
+      ctx.font = compact ? '11px Inter, sans-serif' : '12px Inter, sans-serif';
       ctx.fillStyle = c.labelMuted;
-      ctx.fillText('Playback (s)', 12, 16);
-      ctx.fillText(p.axisTitle, 12, 38);
-      ctx.fillText('Rainfall', 12, top + pitchH / 2 - 4); ctx.fillText(mode === 'musical' ? 'melody' : 'melody (muted)', 12, top + pitchH / 2 + 12);
-      if ((p.events[p.cursor] ?? []).some((e) => e.kind === 'reference') || p.events.some((st) => st.some((e) => e.kind === 'reference'))) {
-        ctx.strokeStyle = c.refLegend; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(12, top + pitchH / 2 + 28); ctx.lineTo(34, top + pitchH / 2 + 28); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillText('normal (hum)', 40, top + pitchH / 2 + 32);
-        ctx.fillStyle = c.wet; ctx.fillText('▲ wetter', 12, top + pitchH / 2 + 50);
-        ctx.fillStyle = c.dry; ctx.fillText('▼ drier', 70, top + pitchH / 2 + 50);
-        ctx.fillStyle = c.labelMuted;
+      ctx.fillText(compact ? 'Time' : 'Playback (s)', 10, 16);
+      ctx.fillText(compact ? 'Step' : p.axisTitle, 10, 38);
+      if (compact) {
+        ctx.fillText(mode === 'musical' ? 'Melody' : 'Muted', 10, top + pitchH / 2 - 4);
+      } else {
+        ctx.fillText('Rainfall', 12, top + pitchH / 2 - 4); ctx.fillText(mode === 'musical' ? 'melody' : 'melody (muted)', 12, top + pitchH / 2 + 12);
       }
-      ctx.fillText('Rain texture', 12, texY + laneTex / 2 + 4);
-      ctx.fillText('Event markers', 12, markY + laneMark / 2 + 4);
+      if ((p.events[p.cursor] ?? []).some((e) => e.kind === 'reference') || p.events.some((st) => st.some((e) => e.kind === 'reference'))) {
+        if (compact) {
+          ctx.fillStyle = c.wet; ctx.fillText('▲ wet', 10, top + pitchH / 2 + 16);
+          ctx.fillStyle = c.dry; ctx.fillText('▼ dry', 10, top + pitchH / 2 + 32);
+          ctx.fillStyle = c.labelMuted;
+        } else {
+          ctx.strokeStyle = c.refLegend; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(12, top + pitchH / 2 + 28); ctx.lineTo(34, top + pitchH / 2 + 28); ctx.stroke(); ctx.setLineDash([]);
+          ctx.fillText('normal (hum)', 40, top + pitchH / 2 + 32);
+          ctx.fillStyle = c.wet; ctx.fillText('▲ wetter', 12, top + pitchH / 2 + 50);
+          ctx.fillStyle = c.dry; ctx.fillText('▼ drier', 70, top + pitchH / 2 + 50);
+          ctx.fillStyle = c.labelMuted;
+        }
+      }
+      ctx.fillText(compact ? 'Texture' : 'Rain texture', 10, texY + laneTex / 2 + 4);
+      ctx.fillText(compact ? 'Markers' : 'Event markers', 10, markY + laneMark / 2 + 4);
 
       // piano keys
       for (let m = LOW; m <= HIGH; m++) {
         const y0 = py(m + 0.5), y1 = py(m - 0.5);
         ctx.fillStyle = BLACK.has(m % 12) ? c.keyBlack : c.keyWhite;
-        ctx.fillRect(left, y0, keysW - 6, Math.max(1, y1 - y0 - 0.5));
-        if (c.keyStroke && !BLACK.has(m % 12)) { ctx.strokeStyle = c.keyStroke; ctx.lineWidth = 0.5; ctx.strokeRect(left, y0, keysW - 6, Math.max(1, y1 - y0 - 0.5)); }
-        if (m % 12 === 0) { ctx.fillStyle = c.keyLabel; ctx.font = '10px JetBrains Mono, monospace'; ctx.fillText(midiToName(m), left - 26, py(m) + 3); }
+        ctx.fillRect(left, y0, keysW - 4, Math.max(1, y1 - y0 - 0.5));
+        if (c.keyStroke && !BLACK.has(m % 12)) { ctx.strokeStyle = c.keyStroke; ctx.lineWidth = 0.5; ctx.strokeRect(left, y0, keysW - 4, Math.max(1, y1 - y0 - 0.5)); }
+        if (m % 12 === 0) { ctx.fillStyle = c.keyLabel; ctx.font = '10px JetBrains Mono, monospace'; ctx.fillText(midiToName(m), left - (compact ? 20 : 26), py(m) + 3); }
       }
       // grid + time axes
       ctx.save();
@@ -297,7 +309,7 @@ export function MusicChart(p: Props) {
           <button role="tab" aria-selected={tab === 'details'} onClick={() => set({ chartTab: 'details' })}>Event details</button>
         </div>
         <div className="spacer" />
-        <div className="row" role="group" aria-label="Playback controls">
+        <div className="row transport-bar" role="group" aria-label="Playback controls">
           <button className="btn icon" onClick={() => stepBy(-1)} disabled={!p.enabled} aria-label="Previous observation"><I.Prev /></button>
           <button className="btn play" onClick={() => void togglePlay()} disabled={!p.enabled} aria-label={playing ? 'Pause (Space)' : 'Play (Space)'} aria-pressed={playing}>
             {playing ? <I.Pause /> : <I.Play />}

@@ -39,3 +39,4 @@ Both should avoid a generic "AI" look.
 - Nobody has listened to the final cut on speakers.
 - The video must be uploaded somewhere public (YouTube or Drive) by a team member; the repo is private.
 - The deck has placeholders: `[video link]`, `[team name and members]`.
+- Later: merged the teammate's `ui/enhancement` (mobile layout) and committed a 7.9 MB review copy of the video at `demo-video/geoorchestra-demo.mp4`. The full render is 23 MB, over the pre-commit hook's 15 MB limit, so it stays local for the upload.

@@ -18,3 +18,4 @@
 # Generated data: collapse in diffs
 public/data/**/*.json linguist-generated=true -diff
 package-lock.json -diff
+*.mp4 binary

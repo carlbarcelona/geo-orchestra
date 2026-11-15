@@ -52,6 +52,32 @@ Every step has a plain-language caption ("Now hearing"), for example:
 - The same text is used by screen-reader announcements on pause and step, and by the optional spoken narration (Accessibility → Speak summaries).
 - During playback, narration speaks only unusual months and rain-band turns.
 
+## Region of interest (`scan-v4`)
+
+`scan-v4` keeps every `scan-v3` rule and turns the old ROI toggle and "Crop sweep" into one **ROI tool** (decision 0003).
+
+- **Choosing the region.** The ROI button in the Visual feed header opens a bar with:
+  - quick picks: Whole frame, West Pacific (detailed), Philippines, Maritime Continent
+  - **Draw on map**: drag a box on the frame
+  - four number fields (West, East, South, North in degrees; negative = W or S), so it also works from the keyboard
+  - **Isolate**, **Clear**
+
+  A region must be at least 3° × 3°.
+- **Isolate** zooms the frame to the region: the NASA image is scaled and shifted so the region fills the stage, and the overlays (scan line, rain systems, explore cursor) follow. With Isolate off, the whole frame stays visible and the outside is dimmed. "West Pacific (detailed)" shows NASA's sharper pre-cropped frames.
+- **Sounds from the region.** The sweep (S), the Frame score, the rain systems and the explore cursor read only the region. Its pitch table spans the region's own latitudes, and its beats (4 to 24) follow its width.
+  - A region inside the West Pacific box (95–150°E, 10°S–30°N) is read from the **1° West Pacific grid**. Anywhere else, it is read from the **2.5° whole-frame grid**.
+- **ROI voice (new).** During the timelapse, each day plays **one short plucked note** for the rain inside the region:
+
+| Region property | Sound |
+| --- | --- |
+| cos-latitude-weighted mean of the decoded cells (mm/day) | **Pitch**: linear over a fixed **0–24 mm/day** (the NASA colorbar's range) on the current scale; higher = more rain |
+| Rain class of that mean | **Loudness** (light / moderate / heavy / very heavy, as the sweep) |
+| Mean below light rain (2 mm/day) | **Silence** |
+| No decodable cell that day | Nothing plays. It is never treated as 0 |
+
+  - It plays half a step after the measured melody, on the "Frame sweep & band" layer. It is listed in the briefing, the "What you hear" guide and the caption ("your region: 3.0 mm/day (image-derived) → plucked E3"), and it can be turned off in Sound studio → Image features.
+  - The values are **image-derived** (decoded from NASA's colours), not measurements. The piano melody still plays the linked, reconstructed area mean of the region chosen under "Selection" (Philippines, Luzon, Visayas or Mindanao); the ROI never relabels it.
+
 ## Frame sweep (`scan-v3`): the whole frame, edge to edge
 
 `scan-v3` keeps every rule of `scan-v2` below and changes **what is swept** (decision 0002):
@@ -70,7 +96,7 @@ Every step has a plain-language caption ("Now hearing"), for example:
 | Its cells in the column under the line | The scan line **widens over exactly those latitudes**, in the zone's colour (teal tropical, violet mid-latitude), and the whole system lights up while the line is inside it. A label gives its number, zone, rain class and shape ("stretched southwest–northeast", from its long axis). |
 
 - Systems are numbered west → east. Systems already passed keep a faint outline. The Frame score outlines them too.
-- **Crop (optional).** "Crop sweep" lets the user drag a box on the full frame. The sweep, the score, the rain systems and the explore cursor then read only that box, and its beats (4 to 24) follow its width. "Full frame" clears it.
+- **Crop (optional).** Drag a box on the full frame. The sweep, the score, the rain systems and the explore cursor then read only that box, and its beats (4 to 24) follow its width. In `scan-v4` this is the ROI tool (above).
 - **Limits:** a system that crosses the 180° edge of the frame is counted as two, one at each edge. A system is a listening and viewing aid computed from image-derived values; it is never a new measurement, and never named as a storm or cyclone.
 
 ### The `scan-v2` rules that still apply

@@ -28,6 +28,12 @@ interface Props {
   checkpointKey?: (i: number) => string;
 }
 
+/** The ROI voice (scan-v4) in words, appended to the caption when it plays this step. */
+function roiCaption(events: SoundEvent[]): string {
+  const roi = events.find((e) => e.selectionId === 'roi' && e.kind === 'scan');
+  return roi?.original.value != null ? ` · your region: ${roi.original.value.toFixed(1)} mm/day (image-derived) → plucked ${roi.note}` : '';
+}
+
 const WET = '#38bdf8', DRY = '#fb923c';
 const isWet = (c?: string | null) => c === 'wetter' || c === 'much-wetter';
 const isDry = (c?: string | null) => c === 'drier' || c === 'much-drier';
@@ -253,7 +259,7 @@ export function MusicChart(p: Props) {
   const curEvents = p.events[p.cursor] ?? [];
   const primary = curEvents.find((e) => e.kind === 'melody') ?? curEvents.find((e) => e.kind === 'marker');
   const caption = p.enabled && curEvents.some((e) => e.kind === 'melody' || e.kind === 'texture' || e.marker === 'missing')
-    ? explainStep(curEvents, mode, p.captionLabel?.(p.cursor) ?? p.stepLabels[p.cursor] ?? '') : '';
+    ? explainStep(curEvents, mode, p.captionLabel?.(p.cursor) ?? p.stepLabels[p.cursor] ?? '') + roiCaption(curEvents) : '';
   const rollLabel = caption ? `Piano roll. ${caption}` : primary ? `Piano roll. Current step ${p.stepLabels[p.cursor]}: ${primary.explanation}` : 'Piano roll';
   const playing = playback !== 'stopped';
   const capCat = (curEvents.find((e) => e.kind === 'melody') ?? curEvents.find((e) => e.kind === 'texture'))?.context?.category;

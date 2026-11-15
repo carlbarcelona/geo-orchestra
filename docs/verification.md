@@ -33,7 +33,7 @@
   4. Apply a trailing 30-day mean.
 - This is not the SVS daily product, and the app never labels it as exact.
 
-## Automated checks (`npm test`, 98 passing on 15 Nov 2026, after merging scan-v3 and cue-v1)
+## Automated checks (`npm test`: 98 passing on 15 Nov 2026 after scan-v3 and cue-v1; 138 after the mode-switch fix, layout, briefing and scan-v4 ROI tests)
 - Missing vs zero
 - No change computed across gaps
 - cos-latitude aggregation, coverage threshold and mask
@@ -65,6 +65,17 @@
   - no doubled schedules after repeated play/pause
   - buffering on an unready frame
   - loop wrap
+
+## Mode switch, resizable panels, briefing and ROI (15 Nov 2026, Claude in Chrome, localhost:5190)
+- **Preset → Advanced freeze, reproduced on `main` before the fix:** after opening the Visual feed in Preset, clicking Advanced emptied `#root` (24,123 → 0 characters of HTML). The console showed "Rendered more hooks than during the previous render" in `NasaDataPanel`. After the fix, switching both ways on both tabs takes about 60 ms per switch, with no console errors.
+- **Panels:** dragging the music chart's top edge and the left gap resizes the panels. The arrow keys on a handle move it 16 px without stepping the timeline. Reset layout clears the stored sizes. At the minimum widths, the Sound panel stacks its selects, and "Rainfall → Pitch" is fully readable.
+- **Briefing, Preset:** Start listening opens the briefing (8 parts in Compare with normal). Words highlight as they are read, every example plays, and the modal closes by itself; then playback starts ("Playing"). There is no Skip.
+- **Briefing, Advanced:** the same sounds are not briefed again. Switching to Geophony briefs again, with Skip and the on/off switch. Skip starts playback.
+- **ROI:**
+  - Philippines pick: the frame isolates and zooms to 116–127.5°E, 4.5–21.5°N, showing NASA's July monsoon colours.
+  - A drawn box (26.7–124.3°E, 22.5°S–43.1°N) isolates, and its sweep runs 20 beats over 8.4 s, "crossing 4 rain systems".
+  - The timelapse caption adds "your region: 3.0 mm/day (image-derived) → plucked E3", and the briefing gains "Your region · ROI voice".
+  - West Pacific (detailed) loads NASA's `roi/` frames.
 
 ## Browser checks (Claude in Chrome, localhost)
 Exercised in the browser:

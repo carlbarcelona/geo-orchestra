@@ -66,6 +66,7 @@ export function NarrationToggle() {
 
 export function ListeningGuide({ workspace }: { workspace: 'numerical' | 'visual' }) {
   const sound = useStore((s) => s.sound);
+  const roiVoice = useStore((s) => (s.visual.roi || !!s.visual.crop) && s.image.enabled && s.image.roiVoice);
   const items = workspace === 'numerical'
     ? [
         sound.mode === 'musical' ? ['Piano', 'this month’s rain — higher note = more rain'] : ['Rain', 'more drops = more rain this month'],
@@ -83,6 +84,7 @@ export function ListeningGuide({ workspace }: { workspace: 'numerical' | 'visual
         ['Chime', 'the rain band turns around'],
         ['Sweep (S)', `the whole map, ${SCAN.global.beats} beats west → east · pitch = latitude · louder = heavier · silence = dry`],
         ['Held pad', 'a rain system the line is crossing (warm = tropical, darker = storm track); it lights up on the map'],
+        roiVoice && ['Plucked note', 'the rain inside your region of interest (ROI) — higher = more rain, silence = dry there'],
       ];
   return (
     <div className="section listening-guide">

@@ -24,4 +24,6 @@ Other notes:
 - "Normal" needs at least 5 valid years of a calendar month within 2001–2022. The synthetic demo and short imports have no normal, so they play the amount only (the caption says so).
 - Wetter/drier categories and the "unusual" bell are listening aids computed from the measurements. They are not new measurements and are not attributed to any cause (for example ENSO).
 - Narration depends on the browser's speech engine and voices.
+- An isolated ROI is the web-sized NASA frame (1024 × 512) enlarged, so a small region looks soft or blocky. "West Pacific (detailed)" uses NASA's sharper pre-cropped frames.
+- Outside the West Pacific box the ROI voice and sweep read 2.5° cells, so a small region there covers only a few cells. A region that crosses the 180° edge cannot be drawn.
 - The briefing's word highlight follows the voice's word events. Some voices (several network voices in Chrome) send none; the highlight then follows an estimated reading speed and can drift from the voice by a word or two.

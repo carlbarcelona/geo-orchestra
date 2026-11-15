@@ -1,0 +1,2242 @@
+{
+ "contract": "frame-date-alignment",
+ "version": 1,
+ "method": "Consecutive SVS date-overlay frames compared pixel-wise; a change of more than 500 pixels starts a new calendar day (same-day encoder noise stays below 50 pixels). Each run of frames is one day.",
+ "pixelChange": {
+  "sameDayMax": 54,
+  "newDayMin": 6355,
+  "threshold": 500
+ },
+ "overlayFrames": 1000,
+ "dayRuns": 366,
+ "distinctOverlays": 366,
+ "datesListLines": 501,
+ "datesListDedupMatchesRunsExceptFeb29": true,
+ "datesListHasFeb29": false,
+ "feb29": {
+  "day": 60,
+  "frames": [
+   162,
+   163,
+   164
+  ],
+  "evidence": "Overlay frames show 'February 29' between 'February 28' and 'March 01'; IMERGclim_dates2.txt omits it, so the text list cannot be used as a frame index."
+ },
+ "manualSpotChecks": [
+  {
+   "frame": 3,
+   "overlay": "January 02"
+  },
+  {
+   "frame": 1000,
+   "overlay": "December 31"
+  },
+  {
+   "frame": 162,
+   "overlay": "February 29"
+  },
+  {
+   "frame": 165,
+   "overlay": "March 01"
+  }
+ ],
+ "note": "Frame index is not a calendar day: runs have 1-3 frames (366 days over 1000 frames). The dates text file (501 lines, no Feb 29) does not map 1:1 to the 1000 frames.",
+ "runs": [
+  {
+   "day": 1,
+   "label": "Jan 01",
+   "first": 1,
+   "last": 2
+  },
+  {
+   "day": 2,
+   "label": "Jan 02",
+   "first": 3,
+   "last": 5
+  },
+  {
+   "day": 3,
+   "label": "Jan 03",
+   "first": 6,
+   "last": 8
+  },
+  {
+   "day": 4,
+   "label": "Jan 04",
+   "first": 9,
+   "last": 10
+  },
+  {
+   "day": 5,
+   "label": "Jan 05",
+   "first": 11,
+   "last": 13
+  },
+  {
+   "day": 6,
+   "label": "Jan 06",
+   "first": 14,
+   "last": 16
+  },
+  {
+   "day": 7,
+   "label": "Jan 07",
+   "first": 17,
+   "last": 19
+  },
+  {
+   "day": 8,
+   "label": "Jan 08",
+   "first": 20,
+   "last": 21
+  },
+  {
+   "day": 9,
+   "label": "Jan 09",
+   "first": 22,
+   "last": 24
+  },
+  {
+   "day": 10,
+   "label": "Jan 10",
+   "first": 25,
+   "last": 27
+  },
+  {
+   "day": 11,
+   "label": "Jan 11",
+   "first": 28,
+   "last": 30
+  },
+  {
+   "day": 12,
+   "label": "Jan 12",
+   "first": 31,
+   "last": 32
+  },
+  {
+   "day": 13,
+   "label": "Jan 13",
+   "first": 33,
+   "last": 35
+  },
+  {
+   "day": 14,
+   "label": "Jan 14",
+   "first": 36,
+   "last": 38
+  },
+  {
+   "day": 15,
+   "label": "Jan 15",
+   "first": 39,
+   "last": 41
+  },
+  {
+   "day": 16,
+   "label": "Jan 16",
+   "first": 42,
+   "last": 43
+  },
+  {
+   "day": 17,
+   "label": "Jan 17",
+   "first": 44,
+   "last": 46
+  },
+  {
+   "day": 18,
+   "label": "Jan 18",
+   "first": 47,
+   "last": 49
+  },
+  {
+   "day": 19,
+   "label": "Jan 19",
+   "first": 50,
+   "last": 52
+  },
+  {
+   "day": 20,
+   "label": "Jan 20",
+   "first": 53,
+   "last": 54
+  },
+  {
+   "day": 21,
+   "label": "Jan 21",
+   "first": 55,
+   "last": 57
+  },
+  {
+   "day": 22,
+   "label": "Jan 22",
+   "first": 58,
+   "last": 60
+  },
+  {
+   "day": 23,
+   "label": "Jan 23",
+   "first": 61,
+   "last": 63
+  },
+  {
+   "day": 24,
+   "label": "Jan 24",
+   "first": 64,
+   "last": 65
+  },
+  {
+   "day": 25,
+   "label": "Jan 25",
+   "first": 66,
+   "last": 68
+  },
+  {
+   "day": 26,
+   "label": "Jan 26",
+   "first": 69,
+   "last": 71
+  },
+  {
+   "day": 27,
+   "label": "Jan 27",
+   "first": 72,
+   "last": 73
+  },
+  {
+   "day": 28,
+   "label": "Jan 28",
+   "first": 74,
+   "last": 76
+  },
+  {
+   "day": 29,
+   "label": "Jan 29",
+   "first": 77,
+   "last": 79
+  },
+  {
+   "day": 30,
+   "label": "Jan 30",
+   "first": 80,
+   "last": 82
+  },
+  {
+   "day": 31,
+   "label": "Jan 31",
+   "first": 83,
+   "last": 84
+  },
+  {
+   "day": 32,
+   "label": "Feb 01",
+   "first": 85,
+   "last": 87
+  },
+  {
+   "day": 33,
+   "label": "Feb 02",
+   "first": 88,
+   "last": 90
+  },
+  {
+   "day": 34,
+   "label": "Feb 03",
+   "first": 91,
+   "last": 93
+  },
+  {
+   "day": 35,
+   "label": "Feb 04",
+   "first": 94,
+   "last": 95
+  },
+  {
+   "day": 36,
+   "label": "Feb 05",
+   "first": 96,
+   "last": 98
+  },
+  {
+   "day": 37,
+   "label": "Feb 06",
+   "first": 99,
+   "last": 101
+  },
+  {
+   "day": 38,
+   "label": "Feb 07",
+   "first": 102,
+   "last": 104
+  },
+  {
+   "day": 39,
+   "label": "Feb 08",
+   "first": 105,
+   "last": 106
+  },
+  {
+   "day": 40,
+   "label": "Feb 09",
+   "first": 107,
+   "last": 109
+  },
+  {
+   "day": 41,
+   "label": "Feb 10",
+   "first": 110,
+   "last": 112
+  },
+  {
+   "day": 42,
+   "label": "Feb 11",
+   "first": 113,
+   "last": 115
+  },
+  {
+   "day": 43,
+   "label": "Feb 12",
+   "first": 116,
+   "last": 117
+  },
+  {
+   "day": 44,
+   "label": "Feb 13",
+   "first": 118,
+   "last": 120
+  },
+  {
+   "day": 45,
+   "label": "Feb 14",
+   "first": 121,
+   "last": 123
+  },
+  {
+   "day": 46,
+   "label": "Feb 15",
+   "first": 124,
+   "last": 126
+  },
+  {
+   "day": 47,
+   "label": "Feb 16",
+   "first": 127,
+   "last": 128
+  },
+  {
+   "day": 48,
+   "label": "Feb 17",
+   "first": 129,
+   "last": 131
+  },
+  {
+   "day": 49,
+   "label": "Feb 18",
+   "first": 132,
+   "last": 134
+  },
+  {
+   "day": 50,
+   "label": "Feb 19",
+   "first": 135,
+   "last": 136
+  },
+  {
+   "day": 51,
+   "label": "Feb 20",
+   "first": 137,
+   "last": 139
+  },
+  {
+   "day": 52,
+   "label": "Feb 21",
+   "first": 140,
+   "last": 142
+  },
+  {
+   "day": 53,
+   "label": "Feb 22",
+   "first": 143,
+   "last": 145
+  },
+  {
+   "day": 54,
+   "label": "Feb 23",
+   "first": 146,
+   "last": 147
+  },
+  {
+   "day": 55,
+   "label": "Feb 24",
+   "first": 148,
+   "last": 150
+  },
+  {
+   "day": 56,
+   "label": "Feb 25",
+   "first": 151,
+   "last": 153
+  },
+  {
+   "day": 57,
+   "label": "Feb 26",
+   "first": 154,
+   "last": 156
+  },
+  {
+   "day": 58,
+   "label": "Feb 27",
+   "first": 157,
+   "last": 158
+  },
+  {
+   "day": 59,
+   "label": "Feb 28",
+   "first": 159,
+   "last": 161
+  },
+  {
+   "day": 60,
+   "label": "Feb 29",
+   "first": 162,
+   "last": 164
+  },
+  {
+   "day": 61,
+   "label": "Mar 01",
+   "first": 165,
+   "last": 167
+  },
+  {
+   "day": 62,
+   "label": "Mar 02",
+   "first": 168,
+   "last": 169
+  },
+  {
+   "day": 63,
+   "label": "Mar 03",
+   "first": 170,
+   "last": 172
+  },
+  {
+   "day": 64,
+   "label": "Mar 04",
+   "first": 173,
+   "last": 175
+  },
+  {
+   "day": 65,
+   "label": "Mar 05",
+   "first": 176,
+   "last": 178
+  },
+  {
+   "day": 66,
+   "label": "Mar 06",
+   "first": 179,
+   "last": 180
+  },
+  {
+   "day": 67,
+   "label": "Mar 07",
+   "first": 181,
+   "last": 183
+  },
+  {
+   "day": 68,
+   "label": "Mar 08",
+   "first": 184,
+   "last": 186
+  },
+  {
+   "day": 69,
+   "label": "Mar 09",
+   "first": 187,
+   "last": 189
+  },
+  {
+   "day": 70,
+   "label": "Mar 10",
+   "first": 190,
+   "last": 191
+  },
+  {
+   "day": 71,
+   "label": "Mar 11",
+   "first": 192,
+   "last": 194
+  },
+  {
+   "day": 72,
+   "label": "Mar 12",
+   "first": 195,
+   "last": 197
+  },
+  {
+   "day": 73,
+   "label": "Mar 13",
+   "first": 198,
+   "last": 199
+  },
+  {
+   "day": 74,
+   "label": "Mar 14",
+   "first": 200,
+   "last": 202
+  },
+  {
+   "day": 75,
+   "label": "Mar 15",
+   "first": 203,
+   "last": 205
+  },
+  {
+   "day": 76,
+   "label": "Mar 16",
+   "first": 206,
+   "last": 208
+  },
+  {
+   "day": 77,
+   "label": "Mar 17",
+   "first": 209,
+   "last": 210
+  },
+  {
+   "day": 78,
+   "label": "Mar 18",
+   "first": 211,
+   "last": 213
+  },
+  {
+   "day": 79,
+   "label": "Mar 19",
+   "first": 214,
+   "last": 216
+  },
+  {
+   "day": 80,
+   "label": "Mar 20",
+   "first": 217,
+   "last": 219
+  },
+  {
+   "day": 81,
+   "label": "Mar 21",
+   "first": 220,
+   "last": 221
+  },
+  {
+   "day": 82,
+   "label": "Mar 22",
+   "first": 222,
+   "last": 224
+  },
+  {
+   "day": 83,
+   "label": "Mar 23",
+   "first": 225,
+   "last": 227
+  },
+  {
+   "day": 84,
+   "label": "Mar 24",
+   "first": 228,
+   "last": 230
+  },
+  {
+   "day": 85,
+   "label": "Mar 25",
+   "first": 231,
+   "last": 232
+  },
+  {
+   "day": 86,
+   "label": "Mar 26",
+   "first": 233,
+   "last": 235
+  },
+  {
+   "day": 87,
+   "label": "Mar 27",
+   "first": 236,
+   "last": 238
+  },
+  {
+   "day": 88,
+   "label": "Mar 28",
+   "first": 239,
+   "last": 241
+  },
+  {
+   "day": 89,
+   "label": "Mar 29",
+   "first": 242,
+   "last": 243
+  },
+  {
+   "day": 90,
+   "label": "Mar 30",
+   "first": 244,
+   "last": 246
+  },
+  {
+   "day": 91,
+   "label": "Mar 31",
+   "first": 247,
+   "last": 249
+  },
+  {
+   "day": 92,
+   "label": "Apr 01",
+   "first": 250,
+   "last": 252
+  },
+  {
+   "day": 93,
+   "label": "Apr 02",
+   "first": 253,
+   "last": 254
+  },
+  {
+   "day": 94,
+   "label": "Apr 03",
+   "first": 255,
+   "last": 257
+  },
+  {
+   "day": 95,
+   "label": "Apr 04",
+   "first": 258,
+   "last": 260
+  },
+  {
+   "day": 96,
+   "label": "Apr 05",
+   "first": 261,
+   "last": 263
+  },
+  {
+   "day": 97,
+   "label": "Apr 06",
+   "first": 264,
+   "last": 265
+  },
+  {
+   "day": 98,
+   "label": "Apr 07",
+   "first": 266,
+   "last": 268
+  },
+  {
+   "day": 99,
+   "label": "Apr 08",
+   "first": 269,
+   "last": 271
+  },
+  {
+   "day": 100,
+   "label": "Apr 09",
+   "first": 272,
+   "last": 273
+  },
+  {
+   "day": 101,
+   "label": "Apr 10",
+   "first": 274,
+   "last": 276
+  },
+  {
+   "day": 102,
+   "label": "Apr 11",
+   "first": 277,
+   "last": 279
+  },
+  {
+   "day": 103,
+   "label": "Apr 12",
+   "first": 280,
+   "last": 282
+  },
+  {
+   "day": 104,
+   "label": "Apr 13",
+   "first": 283,
+   "last": 284
+  },
+  {
+   "day": 105,
+   "label": "Apr 14",
+   "first": 285,
+   "last": 287
+  },
+  {
+   "day": 106,
+   "label": "Apr 15",
+   "first": 288,
+   "last": 290
+  },
+  {
+   "day": 107,
+   "label": "Apr 16",
+   "first": 291,
+   "last": 293
+  },
+  {
+   "day": 108,
+   "label": "Apr 17",
+   "first": 294,
+   "last": 295
+  },
+  {
+   "day": 109,
+   "label": "Apr 18",
+   "first": 296,
+   "last": 298
+  },
+  {
+   "day": 110,
+   "label": "Apr 19",
+   "first": 299,
+   "last": 301
+  },
+  {
+   "day": 111,
+   "label": "Apr 20",
+   "first": 302,
+   "last": 304
+  },
+  {
+   "day": 112,
+   "label": "Apr 21",
+   "first": 305,
+   "last": 306
+  },
+  {
+   "day": 113,
+   "label": "Apr 22",
+   "first": 307,
+   "last": 309
+  },
+  {
+   "day": 114,
+   "label": "Apr 23",
+   "first": 310,
+   "last": 312
+  },
+  {
+   "day": 115,
+   "label": "Apr 24",
+   "first": 313,
+   "last": 315
+  },
+  {
+   "day": 116,
+   "label": "Apr 25",
+   "first": 316,
+   "last": 317
+  },
+  {
+   "day": 117,
+   "label": "Apr 26",
+   "first": 318,
+   "last": 320
+  },
+  {
+   "day": 118,
+   "label": "Apr 27",
+   "first": 321,
+   "last": 323
+  },
+  {
+   "day": 119,
+   "label": "Apr 28",
+   "first": 324,
+   "last": 326
+  },
+  {
+   "day": 120,
+   "label": "Apr 29",
+   "first": 327,
+   "last": 328
+  },
+  {
+   "day": 121,
+   "label": "Apr 30",
+   "first": 329,
+   "last": 331
+  },
+  {
+   "day": 122,
+   "label": "May 01",
+   "first": 332,
+   "last": 334
+  },
+  {
+   "day": 123,
+   "label": "May 02",
+   "first": 335,
+   "last": 336
+  },
+  {
+   "day": 124,
+   "label": "May 03",
+   "first": 337,
+   "last": 339
+  },
+  {
+   "day": 125,
+   "label": "May 04",
+   "first": 340,
+   "last": 342
+  },
+  {
+   "day": 126,
+   "label": "May 05",
+   "first": 343,
+   "last": 345
+  },
+  {
+   "day": 127,
+   "label": "May 06",
+   "first": 346,
+   "last": 347
+  },
+  {
+   "day": 128,
+   "label": "May 07",
+   "first": 348,
+   "last": 350
+  },
+  {
+   "day": 129,
+   "label": "May 08",
+   "first": 351,
+   "last": 353
+  },
+  {
+   "day": 130,
+   "label": "May 09",
+   "first": 354,
+   "last": 356
+  },
+  {
+   "day": 131,
+   "label": "May 10",
+   "first": 357,
+   "last": 358
+  },
+  {
+   "day": 132,
+   "label": "May 11",
+   "first": 359,
+   "last": 361
+  },
+  {
+   "day": 133,
+   "label": "May 12",
+   "first": 362,
+   "last": 364
+  },
+  {
+   "day": 134,
+   "label": "May 13",
+   "first": 365,
+   "last": 367
+  },
+  {
+   "day": 135,
+   "label": "May 14",
+   "first": 368,
+   "last": 369
+  },
+  {
+   "day": 136,
+   "label": "May 15",
+   "first": 370,
+   "last": 372
+  },
+  {
+   "day": 137,
+   "label": "May 16",
+   "first": 373,
+   "last": 375
+  },
+  {
+   "day": 138,
+   "label": "May 17",
+   "first": 376,
+   "last": 378
+  },
+  {
+   "day": 139,
+   "label": "May 18",
+   "first": 379,
+   "last": 380
+  },
+  {
+   "day": 140,
+   "label": "May 19",
+   "first": 381,
+   "last": 383
+  },
+  {
+   "day": 141,
+   "label": "May 20",
+   "first": 384,
+   "last": 386
+  },
+  {
+   "day": 142,
+   "label": "May 21",
+   "first": 387,
+   "last": 389
+  },
+  {
+   "day": 143,
+   "label": "May 22",
+   "first": 390,
+   "last": 391
+  },
+  {
+   "day": 144,
+   "label": "May 23",
+   "first": 392,
+   "last": 394
+  },
+  {
+   "day": 145,
+   "label": "May 24",
+   "first": 395,
+   "last": 397
+  },
+  {
+   "day": 146,
+   "label": "May 25",
+   "first": 398,
+   "last": 399
+  },
+  {
+   "day": 147,
+   "label": "May 26",
+   "first": 400,
+   "last": 402
+  },
+  {
+   "day": 148,
+   "label": "May 27",
+   "first": 403,
+   "last": 405
+  },
+  {
+   "day": 149,
+   "label": "May 28",
+   "first": 406,
+   "last": 408
+  },
+  {
+   "day": 150,
+   "label": "May 29",
+   "first": 409,
+   "last": 410
+  },
+  {
+   "day": 151,
+   "label": "May 30",
+   "first": 411,
+   "last": 413
+  },
+  {
+   "day": 152,
+   "label": "May 31",
+   "first": 414,
+   "last": 416
+  },
+  {
+   "day": 153,
+   "label": "Jun 01",
+   "first": 417,
+   "last": 419
+  },
+  {
+   "day": 154,
+   "label": "Jun 02",
+   "first": 420,
+   "last": 421
+  },
+  {
+   "day": 155,
+   "label": "Jun 03",
+   "first": 422,
+   "last": 424
+  },
+  {
+   "day": 156,
+   "label": "Jun 04",
+   "first": 425,
+   "last": 427
+  },
+  {
+   "day": 157,
+   "label": "Jun 05",
+   "first": 428,
+   "last": 430
+  },
+  {
+   "day": 158,
+   "label": "Jun 06",
+   "first": 431,
+   "last": 432
+  },
+  {
+   "day": 159,
+   "label": "Jun 07",
+   "first": 433,
+   "last": 435
+  },
+  {
+   "day": 160,
+   "label": "Jun 08",
+   "first": 436,
+   "last": 438
+  },
+  {
+   "day": 161,
+   "label": "Jun 09",
+   "first": 439,
+   "last": 441
+  },
+  {
+   "day": 162,
+   "label": "Jun 10",
+   "first": 442,
+   "last": 443
+  },
+  {
+   "day": 163,
+   "label": "Jun 11",
+   "first": 444,
+   "last": 446
+  },
+  {
+   "day": 164,
+   "label": "Jun 12",
+   "first": 447,
+   "last": 449
+  },
+  {
+   "day": 165,
+   "label": "Jun 13",
+   "first": 450,
+   "last": 452
+  },
+  {
+   "day": 166,
+   "label": "Jun 14",
+   "first": 453,
+   "last": 454
+  },
+  {
+   "day": 167,
+   "label": "Jun 15",
+   "first": 455,
+   "last": 457
+  },
+  {
+   "day": 168,
+   "label": "Jun 16",
+   "first": 458,
+   "last": 460
+  },
+  {
+   "day": 169,
+   "label": "Jun 17",
+   "first": 461,
+   "last": 463
+  },
+  {
+   "day": 170,
+   "label": "Jun 18",
+   "first": 464,
+   "last": 465
+  },
+  {
+   "day": 171,
+   "label": "Jun 19",
+   "first": 466,
+   "last": 468
+  },
+  {
+   "day": 172,
+   "label": "Jun 20",
+   "first": 469,
+   "last": 471
+  },
+  {
+   "day": 173,
+   "label": "Jun 21",
+   "first": 472,
+   "last": 473
+  },
+  {
+   "day": 174,
+   "label": "Jun 22",
+   "first": 474,
+   "last": 476
+  },
+  {
+   "day": 175,
+   "label": "Jun 23",
+   "first": 477,
+   "last": 479
+  },
+  {
+   "day": 176,
+   "label": "Jun 24",
+   "first": 480,
+   "last": 482
+  },
+  {
+   "day": 177,
+   "label": "Jun 25",
+   "first": 483,
+   "last": 484
+  },
+  {
+   "day": 178,
+   "label": "Jun 26",
+   "first": 485,
+   "last": 487
+  },
+  {
+   "day": 179,
+   "label": "Jun 27",
+   "first": 488,
+   "last": 490
+  },
+  {
+   "day": 180,
+   "label": "Jun 28",
+   "first": 491,
+   "last": 493
+  },
+  {
+   "day": 181,
+   "label": "Jun 29",
+   "first": 494,
+   "last": 495
+  },
+  {
+   "day": 182,
+   "label": "Jun 30",
+   "first": 496,
+   "last": 498
+  },
+  {
+   "day": 183,
+   "label": "Jul 01",
+   "first": 499,
+   "last": 501
+  },
+  {
+   "day": 184,
+   "label": "Jul 02",
+   "first": 502,
+   "last": 504
+  },
+  {
+   "day": 185,
+   "label": "Jul 03",
+   "first": 505,
+   "last": 506
+  },
+  {
+   "day": 186,
+   "label": "Jul 04",
+   "first": 507,
+   "last": 509
+  },
+  {
+   "day": 187,
+   "label": "Jul 05",
+   "first": 510,
+   "last": 512
+  },
+  {
+   "day": 188,
+   "label": "Jul 06",
+   "first": 513,
+   "last": 515
+  },
+  {
+   "day": 189,
+   "label": "Jul 07",
+   "first": 516,
+   "last": 517
+  },
+  {
+   "day": 190,
+   "label": "Jul 08",
+   "first": 518,
+   "last": 520
+  },
+  {
+   "day": 191,
+   "label": "Jul 09",
+   "first": 521,
+   "last": 523
+  },
+  {
+   "day": 192,
+   "label": "Jul 10",
+   "first": 524,
+   "last": 526
+  },
+  {
+   "day": 193,
+   "label": "Jul 11",
+   "first": 527,
+   "last": 528
+  },
+  {
+   "day": 194,
+   "label": "Jul 12",
+   "first": 529,
+   "last": 531
+  },
+  {
+   "day": 195,
+   "label": "Jul 13",
+   "first": 532,
+   "last": 534
+  },
+  {
+   "day": 196,
+   "label": "Jul 14",
+   "first": 535,
+   "last": 536
+  },
+  {
+   "day": 197,
+   "label": "Jul 15",
+   "first": 537,
+   "last": 539
+  },
+  {
+   "day": 198,
+   "label": "Jul 16",
+   "first": 540,
+   "last": 542
+  },
+  {
+   "day": 199,
+   "label": "Jul 17",
+   "first": 543,
+   "last": 545
+  },
+  {
+   "day": 200,
+   "label": "Jul 18",
+   "first": 546,
+   "last": 547
+  },
+  {
+   "day": 201,
+   "label": "Jul 19",
+   "first": 548,
+   "last": 550
+  },
+  {
+   "day": 202,
+   "label": "Jul 20",
+   "first": 551,
+   "last": 553
+  },
+  {
+   "day": 203,
+   "label": "Jul 21",
+   "first": 554,
+   "last": 556
+  },
+  {
+   "day": 204,
+   "label": "Jul 22",
+   "first": 557,
+   "last": 558
+  },
+  {
+   "day": 205,
+   "label": "Jul 23",
+   "first": 559,
+   "last": 561
+  },
+  {
+   "day": 206,
+   "label": "Jul 24",
+   "first": 562,
+   "last": 564
+  },
+  {
+   "day": 207,
+   "label": "Jul 25",
+   "first": 565,
+   "last": 567
+  },
+  {
+   "day": 208,
+   "label": "Jul 26",
+   "first": 568,
+   "last": 569
+  },
+  {
+   "day": 209,
+   "label": "Jul 27",
+   "first": 570,
+   "last": 572
+  },
+  {
+   "day": 210,
+   "label": "Jul 28",
+   "first": 573,
+   "last": 575
+  },
+  {
+   "day": 211,
+   "label": "Jul 29",
+   "first": 576,
+   "last": 578
+  },
+  {
+   "day": 212,
+   "label": "Jul 30",
+   "first": 579,
+   "last": 580
+  },
+  {
+   "day": 213,
+   "label": "Jul 31",
+   "first": 581,
+   "last": 583
+  },
+  {
+   "day": 214,
+   "label": "Aug 01",
+   "first": 584,
+   "last": 586
+  },
+  {
+   "day": 215,
+   "label": "Aug 02",
+   "first": 587,
+   "last": 589
+  },
+  {
+   "day": 216,
+   "label": "Aug 03",
+   "first": 590,
+   "last": 591
+  },
+  {
+   "day": 217,
+   "label": "Aug 04",
+   "first": 592,
+   "last": 594
+  },
+  {
+   "day": 218,
+   "label": "Aug 05",
+   "first": 595,
+   "last": 597
+  },
+  {
+   "day": 219,
+   "label": "Aug 06",
+   "first": 598,
+   "last": 600
+  },
+  {
+   "day": 220,
+   "label": "Aug 07",
+   "first": 601,
+   "last": 602
+  },
+  {
+   "day": 221,
+   "label": "Aug 08",
+   "first": 603,
+   "last": 605
+  },
+  {
+   "day": 222,
+   "label": "Aug 09",
+   "first": 606,
+   "last": 608
+  },
+  {
+   "day": 223,
+   "label": "Aug 10",
+   "first": 609,
+   "last": 610
+  },
+  {
+   "day": 224,
+   "label": "Aug 11",
+   "first": 611,
+   "last": 613
+  },
+  {
+   "day": 225,
+   "label": "Aug 12",
+   "first": 614,
+   "last": 616
+  },
+  {
+   "day": 226,
+   "label": "Aug 13",
+   "first": 617,
+   "last": 619
+  },
+  {
+   "day": 227,
+   "label": "Aug 14",
+   "first": 620,
+   "last": 621
+  },
+  {
+   "day": 228,
+   "label": "Aug 15",
+   "first": 622,
+   "last": 624
+  },
+  {
+   "day": 229,
+   "label": "Aug 16",
+   "first": 625,
+   "last": 627
+  },
+  {
+   "day": 230,
+   "label": "Aug 17",
+   "first": 628,
+   "last": 630
+  },
+  {
+   "day": 231,
+   "label": "Aug 18",
+   "first": 631,
+   "last": 632
+  },
+  {
+   "day": 232,
+   "label": "Aug 19",
+   "first": 633,
+   "last": 635
+  },
+  {
+   "day": 233,
+   "label": "Aug 20",
+   "first": 636,
+   "last": 638
+  },
+  {
+   "day": 234,
+   "label": "Aug 21",
+   "first": 639,
+   "last": 641
+  },
+  {
+   "day": 235,
+   "label": "Aug 22",
+   "first": 642,
+   "last": 643
+  },
+  {
+   "day": 236,
+   "label": "Aug 23",
+   "first": 644,
+   "last": 646
+  },
+  {
+   "day": 237,
+   "label": "Aug 24",
+   "first": 647,
+   "last": 649
+  },
+  {
+   "day": 238,
+   "label": "Aug 25",
+   "first": 650,
+   "last": 652
+  },
+  {
+   "day": 239,
+   "label": "Aug 26",
+   "first": 653,
+   "last": 654
+  },
+  {
+   "day": 240,
+   "label": "Aug 27",
+   "first": 655,
+   "last": 657
+  },
+  {
+   "day": 241,
+   "label": "Aug 28",
+   "first": 658,
+   "last": 660
+  },
+  {
+   "day": 242,
+   "label": "Aug 29",
+   "first": 661,
+   "last": 663
+  },
+  {
+   "day": 243,
+   "label": "Aug 30",
+   "first": 664,
+   "last": 665
+  },
+  {
+   "day": 244,
+   "label": "Aug 31",
+   "first": 666,
+   "last": 668
+  },
+  {
+   "day": 245,
+   "label": "Sep 01",
+   "first": 669,
+   "last": 671
+  },
+  {
+   "day": 246,
+   "label": "Sep 02",
+   "first": 672,
+   "last": 673
+  },
+  {
+   "day": 247,
+   "label": "Sep 03",
+   "first": 674,
+   "last": 676
+  },
+  {
+   "day": 248,
+   "label": "Sep 04",
+   "first": 677,
+   "last": 679
+  },
+  {
+   "day": 249,
+   "label": "Sep 05",
+   "first": 680,
+   "last": 682
+  },
+  {
+   "day": 250,
+   "label": "Sep 06",
+   "first": 683,
+   "last": 684
+  },
+  {
+   "day": 251,
+   "label": "Sep 07",
+   "first": 685,
+   "last": 687
+  },
+  {
+   "day": 252,
+   "label": "Sep 08",
+   "first": 688,
+   "last": 690
+  },
+  {
+   "day": 253,
+   "label": "Sep 09",
+   "first": 691,
+   "last": 693
+  },
+  {
+   "day": 254,
+   "label": "Sep 10",
+   "first": 694,
+   "last": 695
+  },
+  {
+   "day": 255,
+   "label": "Sep 11",
+   "first": 696,
+   "last": 698
+  },
+  {
+   "day": 256,
+   "label": "Sep 12",
+   "first": 699,
+   "last": 701
+  },
+  {
+   "day": 257,
+   "label": "Sep 13",
+   "first": 702,
+   "last": 704
+  },
+  {
+   "day": 258,
+   "label": "Sep 14",
+   "first": 705,
+   "last": 706
+  },
+  {
+   "day": 259,
+   "label": "Sep 15",
+   "first": 707,
+   "last": 709
+  },
+  {
+   "day": 260,
+   "label": "Sep 16",
+   "first": 710,
+   "last": 712
+  },
+  {
+   "day": 261,
+   "label": "Sep 17",
+   "first": 713,
+   "last": 715
+  },
+  {
+   "day": 262,
+   "label": "Sep 18",
+   "first": 716,
+   "last": 717
+  },
+  {
+   "day": 263,
+   "label": "Sep 19",
+   "first": 718,
+   "last": 720
+  },
+  {
+   "day": 264,
+   "label": "Sep 20",
+   "first": 721,
+   "last": 723
+  },
+  {
+   "day": 265,
+   "label": "Sep 21",
+   "first": 724,
+   "last": 726
+  },
+  {
+   "day": 266,
+   "label": "Sep 22",
+   "first": 727,
+   "last": 728
+  },
+  {
+   "day": 267,
+   "label": "Sep 23",
+   "first": 729,
+   "last": 731
+  },
+  {
+   "day": 268,
+   "label": "Sep 24",
+   "first": 732,
+   "last": 734
+  },
+  {
+   "day": 269,
+   "label": "Sep 25",
+   "first": 735,
+   "last": 736
+  },
+  {
+   "day": 270,
+   "label": "Sep 26",
+   "first": 737,
+   "last": 739
+  },
+  {
+   "day": 271,
+   "label": "Sep 27",
+   "first": 740,
+   "last": 742
+  },
+  {
+   "day": 272,
+   "label": "Sep 28",
+   "first": 743,
+   "last": 745
+  },
+  {
+   "day": 273,
+   "label": "Sep 29",
+   "first": 746,
+   "last": 747
+  },
+  {
+   "day": 274,
+   "label": "Sep 30",
+   "first": 748,
+   "last": 750
+  },
+  {
+   "day": 275,
+   "label": "Oct 01",
+   "first": 751,
+   "last": 753
+  },
+  {
+   "day": 276,
+   "label": "Oct 02",
+   "first": 754,
+   "last": 756
+  },
+  {
+   "day": 277,
+   "label": "Oct 03",
+   "first": 757,
+   "last": 758
+  },
+  {
+   "day": 278,
+   "label": "Oct 04",
+   "first": 759,
+   "last": 761
+  },
+  {
+   "day": 279,
+   "label": "Oct 05",
+   "first": 762,
+   "last": 764
+  },
+  {
+   "day": 280,
+   "label": "Oct 06",
+   "first": 765,
+   "last": 767
+  },
+  {
+   "day": 281,
+   "label": "Oct 07",
+   "first": 768,
+   "last": 769
+  },
+  {
+   "day": 282,
+   "label": "Oct 08",
+   "first": 770,
+   "last": 772
+  },
+  {
+   "day": 283,
+   "label": "Oct 09",
+   "first": 773,
+   "last": 775
+  },
+  {
+   "day": 284,
+   "label": "Oct 10",
+   "first": 776,
+   "last": 778
+  },
+  {
+   "day": 285,
+   "label": "Oct 11",
+   "first": 779,
+   "last": 780
+  },
+  {
+   "day": 286,
+   "label": "Oct 12",
+   "first": 781,
+   "last": 783
+  },
+  {
+   "day": 287,
+   "label": "Oct 13",
+   "first": 784,
+   "last": 786
+  },
+  {
+   "day": 288,
+   "label": "Oct 14",
+   "first": 787,
+   "last": 789
+  },
+  {
+   "day": 289,
+   "label": "Oct 15",
+   "first": 790,
+   "last": 791
+  },
+  {
+   "day": 290,
+   "label": "Oct 16",
+   "first": 792,
+   "last": 794
+  },
+  {
+   "day": 291,
+   "label": "Oct 17",
+   "first": 795,
+   "last": 797
+  },
+  {
+   "day": 292,
+   "label": "Oct 18",
+   "first": 798,
+   "last": 799
+  },
+  {
+   "day": 293,
+   "label": "Oct 19",
+   "first": 800,
+   "last": 802
+  },
+  {
+   "day": 294,
+   "label": "Oct 20",
+   "first": 803,
+   "last": 805
+  },
+  {
+   "day": 295,
+   "label": "Oct 21",
+   "first": 806,
+   "last": 808
+  },
+  {
+   "day": 296,
+   "label": "Oct 22",
+   "first": 809,
+   "last": 810
+  },
+  {
+   "day": 297,
+   "label": "Oct 23",
+   "first": 811,
+   "last": 813
+  },
+  {
+   "day": 298,
+   "label": "Oct 24",
+   "first": 814,
+   "last": 816
+  },
+  {
+   "day": 299,
+   "label": "Oct 25",
+   "first": 817,
+   "last": 819
+  },
+  {
+   "day": 300,
+   "label": "Oct 26",
+   "first": 820,
+   "last": 821
+  },
+  {
+   "day": 301,
+   "label": "Oct 27",
+   "first": 822,
+   "last": 824
+  },
+  {
+   "day": 302,
+   "label": "Oct 28",
+   "first": 825,
+   "last": 827
+  },
+  {
+   "day": 303,
+   "label": "Oct 29",
+   "first": 828,
+   "last": 830
+  },
+  {
+   "day": 304,
+   "label": "Oct 30",
+   "first": 831,
+   "last": 832
+  },
+  {
+   "day": 305,
+   "label": "Oct 31",
+   "first": 833,
+   "last": 835
+  },
+  {
+   "day": 306,
+   "label": "Nov 01",
+   "first": 836,
+   "last": 838
+  },
+  {
+   "day": 307,
+   "label": "Nov 02",
+   "first": 839,
+   "last": 841
+  },
+  {
+   "day": 308,
+   "label": "Nov 03",
+   "first": 842,
+   "last": 843
+  },
+  {
+   "day": 309,
+   "label": "Nov 04",
+   "first": 844,
+   "last": 846
+  },
+  {
+   "day": 310,
+   "label": "Nov 05",
+   "first": 847,
+   "last": 849
+  },
+  {
+   "day": 311,
+   "label": "Nov 06",
+   "first": 850,
+   "last": 852
+  },
+  {
+   "day": 312,
+   "label": "Nov 07",
+   "first": 853,
+   "last": 854
+  },
+  {
+   "day": 313,
+   "label": "Nov 08",
+   "first": 855,
+   "last": 857
+  },
+  {
+   "day": 314,
+   "label": "Nov 09",
+   "first": 858,
+   "last": 860
+  },
+  {
+   "day": 315,
+   "label": "Nov 10",
+   "first": 861,
+   "last": 863
+  },
+  {
+   "day": 316,
+   "label": "Nov 11",
+   "first": 864,
+   "last": 865
+  },
+  {
+   "day": 317,
+   "label": "Nov 12",
+   "first": 866,
+   "last": 868
+  },
+  {
+   "day": 318,
+   "label": "Nov 13",
+   "first": 869,
+   "last": 871
+  },
+  {
+   "day": 319,
+   "label": "Nov 14",
+   "first": 872,
+   "last": 873
+  },
+  {
+   "day": 320,
+   "label": "Nov 15",
+   "first": 874,
+   "last": 876
+  },
+  {
+   "day": 321,
+   "label": "Nov 16",
+   "first": 877,
+   "last": 879
+  },
+  {
+   "day": 322,
+   "label": "Nov 17",
+   "first": 880,
+   "last": 882
+  },
+  {
+   "day": 323,
+   "label": "Nov 18",
+   "first": 883,
+   "last": 884
+  },
+  {
+   "day": 324,
+   "label": "Nov 19",
+   "first": 885,
+   "last": 887
+  },
+  {
+   "day": 325,
+   "label": "Nov 20",
+   "first": 888,
+   "last": 890
+  },
+  {
+   "day": 326,
+   "label": "Nov 21",
+   "first": 891,
+   "last": 893
+  },
+  {
+   "day": 327,
+   "label": "Nov 22",
+   "first": 894,
+   "last": 895
+  },
+  {
+   "day": 328,
+   "label": "Nov 23",
+   "first": 896,
+   "last": 898
+  },
+  {
+   "day": 329,
+   "label": "Nov 24",
+   "first": 899,
+   "last": 901
+  },
+  {
+   "day": 330,
+   "label": "Nov 25",
+   "first": 902,
+   "last": 904
+  },
+  {
+   "day": 331,
+   "label": "Nov 26",
+   "first": 905,
+   "last": 906
+  },
+  {
+   "day": 332,
+   "label": "Nov 27",
+   "first": 907,
+   "last": 909
+  },
+  {
+   "day": 333,
+   "label": "Nov 28",
+   "first": 910,
+   "last": 912
+  },
+  {
+   "day": 334,
+   "label": "Nov 29",
+   "first": 913,
+   "last": 915
+  },
+  {
+   "day": 335,
+   "label": "Nov 30",
+   "first": 916,
+   "last": 917
+  },
+  {
+   "day": 336,
+   "label": "Dec 01",
+   "first": 918,
+   "last": 920
+  },
+  {
+   "day": 337,
+   "label": "Dec 02",
+   "first": 921,
+   "last": 923
+  },
+  {
+   "day": 338,
+   "label": "Dec 03",
+   "first": 924,
+   "last": 926
+  },
+  {
+   "day": 339,
+   "label": "Dec 04",
+   "first": 927,
+   "last": 928
+  },
+  {
+   "day": 340,
+   "label": "Dec 05",
+   "first": 929,
+   "last": 931
+  },
+  {
+   "day": 341,
+   "label": "Dec 06",
+   "first": 932,
+   "last": 934
+  },
+  {
+   "day": 342,
+   "label": "Dec 07",
+   "first": 935,
+   "last": 936
+  },
+  {
+   "day": 343,
+   "label": "Dec 08",
+   "first": 937,
+   "last": 939
+  },
+  {
+   "day": 344,
+   "label": "Dec 09",
+   "first": 940,
+   "last": 942
+  },
+  {
+   "day": 345,
+   "label": "Dec 10",
+   "first": 943,
+   "last": 945
+  },
+  {
+   "day": 346,
+   "label": "Dec 11",
+   "first": 946,
+   "last": 947
+  },
+  {
+   "day": 347,
+   "label": "Dec 12",
+   "first": 948,
+   "last": 950
+  },
+  {
+   "day": 348,
+   "label": "Dec 13",
+   "first": 951,
+   "last": 953
+  },
+  {
+   "day": 349,
+   "label": "Dec 14",
+   "first": 954,
+   "last": 956
+  },
+  {
+   "day": 350,
+   "label": "Dec 15",
+   "first": 957,
+   "last": 958
+  },
+  {
+   "day": 351,
+   "label": "Dec 16",
+   "first": 959,
+   "last": 961
+  },
+  {
+   "day": 352,
+   "label": "Dec 17",
+   "first": 962,
+   "last": 964
+  },
+  {
+   "day": 353,
+   "label": "Dec 18",
+   "first": 965,
+   "last": 967
+  },
+  {
+   "day": 354,
+   "label": "Dec 19",
+   "first": 968,
+   "last": 969
+  },
+  {
+   "day": 355,
+   "label": "Dec 20",
+   "first": 970,
+   "last": 972
+  },
+  {
+   "day": 356,
+   "label": "Dec 21",
+   "first": 973,
+   "last": 975
+  },
+  {
+   "day": 357,
+   "label": "Dec 22",
+   "first": 976,
+   "last": 978
+  },
+  {
+   "day": 358,
+   "label": "Dec 23",
+   "first": 979,
+   "last": 980
+  },
+  {
+   "day": 359,
+   "label": "Dec 24",
+   "first": 981,
+   "last": 983
+  },
+  {
+   "day": 360,
+   "label": "Dec 25",
+   "first": 984,
+   "last": 986
+  },
+  {
+   "day": 361,
+   "label": "Dec 26",
+   "first": 987,
+   "last": 989
+  },
+  {
+   "day": 362,
+   "label": "Dec 27",
+   "first": 990,
+   "last": 991
+  },
+  {
+   "day": 363,
+   "label": "Dec 28",
+   "first": 992,
+   "last": 994
+  },
+  {
+   "day": 364,
+   "label": "Dec 29",
+   "first": 995,
+   "last": 997
+  },
+  {
+   "day": 365,
+   "label": "Dec 30",
+   "first": 998,
+   "last": 999
+  },
+  {
+   "day": 366,
+   "label": "Dec 31",
+   "first": 1000,
+   "last": 1000
+  }
+ ]
+}

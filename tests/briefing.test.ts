@@ -1,0 +1,215 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('tone', () => ({}));
+vi.mock('../src/sound/engine', () => ({
+  engine: { start: async () => true, playStep: () => {}, silence: () => {}, setInstrument: () => {}, setMaster: () => {}, setLevels: () => {}, audition: async () => {}, auditionCue: async () => {} },
+  INSTRUMENTS: [],
+}));
+
+import { briefingScript, briefingSignature, needsBriefing, tokenize, wordAt, wordMs, type BriefingInput } from '../src/a11y/briefing';
+import { briefingDue, currentBriefing, pauseBriefing, replayBriefing, setUiMode, skipBriefing, startBriefing, togglePlay } from '../src/state/actions';
+import { controller } from '../src/playback/controller';
+import { engine } from '../src/sound/engine';
+import { DEFAULT_SOUND, get, set } from '../src/state/store';
+
+const base: BriefingInput = { workspace: 'numerical', mode: 'musical', reference: true, harmony: true, cues: true, muted: {} };
+const ids = (o: Partial<BriefingInput>) => briefingScript({ ...base, ...o }).map((s) => s.id);
+
+describe('briefing script', () => {
+  it('describes every sound of "Compare with normal" with an example, in order', () => {
+    expect(ids({})).toEqual(['intro', 'amount-melody', 'normal', 'chord', 'bell', 'missing', 'time', 'close']);
+    const s = briefingScript(base);
+    expect(s.find((x) => x.id === 'amount-melody')!.example).toEqual({ kind: 'legend', items: ['low', 'high'] });
+    expect(s.find((x) => x.id === 'amount-melody')!.text).toMatch(/higher.*louder.*more rain/i);
+    expect(s.find((x) => x.id === 'normal')!.title).toMatch(/2001–2022/);
+    expect(s.find((x) => x.id === 'normal')!.text).toMatch(/normal for this month.*above is wetter.*below drier/);
+  });
+
+  it('follows the sound mode: Geophony has rain, thunder and wind, and no piano or chord', () => {
+    const g = ids({ mode: 'geophony' });
+    expect(g).toContain('amount-texture');
+    expect(g).toContain('thunder-wind');
+    expect(g).not.toContain('amount-melody');
+    expect(g).not.toContain('chord');
+  });
+
+  it('never describes a sound that is off or muted', () => {
+    expect(ids({ reference: false, harmony: false, cues: false })).toEqual(['intro', 'amount-melody', 'missing', 'time', 'close']);
+    expect(ids({ muted: { melody: true, time: true, context: true } })).toEqual(['intro', 'missing', 'close']);
+  });
+
+  it('always says missing is not zero (numerical) and that sounds are not recordings', () => {
+    for (const mode of ['musical', 'geophony'] as const) {
+      const s = briefingScript({ ...base, mode });
+      expect(s.find((x) => x.id === 'missing')!.text).toMatch(/missing.*never zero/i);
+      expect(s.at(-1)!.text).toMatch(/not recordings/);
+    }
+  });
+
+  it('visual feed: glide, sweep, and the reconstructed-average honesty line', () => {
+    const v = briefingScript({ ...base, workspace: 'visual', imageEnabled: true, featureVoice: true, frameData: true });
+    expect(v.map((s) => s.id)).toEqual(['intro', 'amount-melody', 'normal', 'chord', 'bell', 'time', 'glide', 'sweep', 'close']);
+    expect(v.find((s) => s.id === 'glide')!.example).toEqual({ kind: 'glide' });
+    expect(v.at(-1)!.text).toMatch(/reconstructed seasonal average/i);
+    expect(v.find((s) => s.id === 'time')!.text).toMatch(/knock marks a month/);
+    // no frame data yet: the glide is explained but has no example
+    expect(briefingScript({ ...base, workspace: 'visual', imageEnabled: true, featureVoice: true }).find((s) => s.id === 'glide')!.example).toBeUndefined();
+  });
+});
+
+describe('who gets briefed', () => {
+  const sig = briefingSignature('numerical', 'musical', briefingScript(base));
+  it('Preset: always, until this briefing was heard', () => {
+    expect(needsBriefing({ uiMode: 'preset', briefAdvanced: false, heard: '', signature: sig })).toBe(true);
+    expect(needsBriefing({ uiMode: 'preset', briefAdvanced: false, heard: sig, signature: sig })).toBe(false);
+  });
+  it('Advanced: only when briefings are on', () => {
+    expect(needsBriefing({ uiMode: 'advanced', briefAdvanced: true, heard: '', signature: sig })).toBe(true);
+    expect(needsBriefing({ uiMode: 'advanced', briefAdvanced: false, heard: '', signature: sig })).toBe(false);
+  });
+  it('a different set of sounds (another preset or mode) means a new briefing', () => {
+    const geo = briefingSignature('numerical', 'geophony', briefingScript({ ...base, mode: 'geophony' }));
+    expect(geo).not.toBe(sig);
+    expect(needsBriefing({ uiMode: 'preset', briefAdvanced: true, heard: sig, signature: geo })).toBe(true);
+  });
+});
+
+describe('word highlighting', () => {
+  it('maps speech boundary offsets to words', () => {
+    const text = 'A higher note means more rain.';
+    const t = tokenize(text);
+    expect(t.map((w) => w.word)).toEqual(['A', 'higher', 'note', 'means', 'more', 'rain.']);
+    expect(wordAt(t, 0)).toBe(0);
+    expect(wordAt(t, text.indexOf('note'))).toBe(2);
+    expect(wordAt(t, text.indexOf('rain'))).toBe(5);
+    expect(wordAt(t, text.indexOf('means') - 1)).toBe(2); // the space after "note"
+  });
+  it('gives longer words and sentence ends more time when there is no voice', () => {
+    expect(wordMs('precipitation')).toBeGreaterThan(wordMs('rain'));
+    expect(wordMs('rain.')).toBeGreaterThan(wordMs('rain'));
+  });
+});
+
+describe('playback waits for the briefing', () => {
+  it('Play in Preset opens the briefing instead of starting, and is ignored while it runs', async () => {
+    set({ tab: 'numerical', uiMode: 'preset', sound: DEFAULT_SOUND, briefed: { numerical: '', visual: '' }, briefing: null });
+    expect(briefingDue()).toBe(true);
+    await togglePlay();
+    expect(get().briefing?.script.map((s) => s.id)).toEqual(currentBriefing().script.map((s) => s.id));
+    expect(get().playback).toBe('stopped');
+    await togglePlay();
+    expect(get().playback).toBe('stopped');
+  });
+  it('Advanced with briefings off plays straight away (no briefing due)', () => {
+    set({ briefing: null, briefed: { numerical: '', visual: '' }, a11y: { ...get().a11y, briefAdvanced: false } });
+    setUiMode('advanced');
+    expect(briefingDue()).toBe(false);
+  });
+});
+
+describe('skipping a briefing', () => {
+  beforeEach(() => {
+    // Finish any briefing opened by another test before isolating the clock.
+    set({ uiMode: 'advanced' });
+    skipBriefing();
+    vi.useFakeTimers();
+    vi.spyOn(controller, 'toggle').mockResolvedValue(true);
+    set({
+      tab: 'numerical', uiMode: 'preset', sound: DEFAULT_SOUND,
+      briefed: { numerical: '', visual: '' }, briefing: null,
+      a11y: { ...get().a11y, briefAdvanced: true },
+      link: { ...get().link, state: 'reconstructed' },
+    });
+  });
+
+  afterEach(() => {
+    set({ uiMode: 'advanced' });
+    skipBriefing();
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ['numerical', false], ['numerical', true],
+    ['visual', false], ['visual', true],
+  ] as const)('Preset %s: skipping (paused=%s) acknowledges only this workspace and finishes once', async (tab, paused) => {
+    set({ tab });
+    const done = vi.fn();
+    const signature = currentBriefing().signature;
+    startBriefing(done);
+    if (paused) pauseBriefing();
+    expect(get().briefing?.paused).toBe(paused);
+
+    skipBriefing();
+    expect(get().briefing).toBeNull();
+    expect(get().briefed[tab]).toBe(signature);
+    expect(get().briefed[tab === 'numerical' ? 'visual' : 'numerical']).toBe('');
+    expect(briefingDue()).toBe(false);
+    expect(done).toHaveBeenCalledTimes(1);
+
+    skipBriefing();
+    await vi.runAllTimersAsync();
+    expect(done).toHaveBeenCalledTimes(1);
+    expect(get().briefing).toBeNull();
+  });
+
+  it.each(['preset', 'advanced'] as const)('%s: skipping continues pending playback once', async (uiMode) => {
+    set({ uiMode });
+    await togglePlay();
+    expect(get().briefing).not.toBeNull();
+    expect(controller.toggle).not.toHaveBeenCalled();
+
+    skipBriefing();
+    expect(get().briefing).toBeNull();
+    expect(controller.toggle).toHaveBeenCalledTimes(1);
+    skipBriefing();
+    await vi.runAllTimersAsync();
+    expect(controller.toggle).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['numerical', 'visual'] as const)('Preset %s: skipping a manual replay does not start playback', (tab) => {
+    set({ tab });
+    replayBriefing();
+    expect(get().briefing).not.toBeNull();
+    skipBriefing();
+    expect(get().briefing).toBeNull();
+    expect(briefingDue()).toBe(false);
+    expect(controller.toggle).not.toHaveBeenCalled();
+  });
+
+  it('a new sound configuration still requires a briefing after skipping', () => {
+    startBriefing();
+    skipBriefing();
+    expect(briefingDue()).toBe(false);
+    set({ sound: { ...get().sound, mode: 'geophony' } });
+    expect(briefingDue()).toBe(true);
+  });
+
+  it('skipping while the first sample is pending cannot play the next queued sample', async () => {
+    let release!: () => void;
+    const audition = vi.spyOn(engine, 'audition').mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+    startBriefing();
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect(audition).toHaveBeenCalledTimes(1);
+    const preview = audition.mock.calls[0][2];
+    skipBriefing();
+    expect(preview?.signal.aborted).toBe(true);
+    release();
+    await vi.runAllTimersAsync();
+    expect(audition).toHaveBeenCalledTimes(1);
+    expect(get().briefing).toBeNull();
+  });
+
+  it('the deadline acknowledges the briefing and continues pending playback exactly once', async () => {
+    vi.spyOn(engine, 'audition').mockImplementation(() => new Promise(() => {}));
+    await togglePlay();
+    expect(get().briefing).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(45_000);
+    expect(get().briefing).toBeNull();
+    expect(briefingDue()).toBe(false);
+    expect(controller.toggle).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(controller.toggle).toHaveBeenCalledTimes(1);
+  });
+});

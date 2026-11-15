@@ -1,0 +1,83 @@
+{
+  "contract": "dataset-manifest",
+  "version": 1,
+  "datasetId": "imerg-monthly-v07b-ph",
+  "datasetVersion": "GPM_3IMERGM V07B",
+  "title": "IMERG Final Monthly Precipitation \u2014 Philippines subset",
+  "variable": "precipitation",
+  "longName": "Merged microwave-infrared-gauge precipitation estimate",
+  "unit": "mm/hr",
+  "unitNote": "Monthly mean precipitation rate, not accumulated rainfall.",
+  "cadence": "monthly",
+  "coverage": {
+    "start": "2000-06",
+    "end": "2024-12",
+    "count": 295,
+    "target": {
+      "start": "2000-06",
+      "end": "2024-12",
+      "count": 295
+    }
+  },
+  "grid": {
+    "nlat": 170,
+    "nlon": 115,
+    "lat0": 4.55,
+    "lon0": 116.05,
+    "step": 0.1,
+    "cellRegistration": "centre",
+    "extent": [
+      116.0,
+      4.5,
+      127.5,
+      21.5
+    ],
+    "layout": "uint16 little-endian [month][lat][lon], lat south->north, lon west->east",
+    "precipitation": {
+      "path": "precip_u16.bin",
+      "scale": 0.001,
+      "missing": 65535
+    },
+    "randomError": {
+      "path": "error_u16.bin",
+      "scale": 0.0001,
+      "missing": 65535
+    }
+  },
+  "quality": {
+    "native": [
+      "randomError (RMS error estimate, mm/hr)",
+      "precipitationQualityIndex (retained in raw bundle)"
+    ],
+    "appDerived": "availability = valid | partial | missing, computed by GeoOrchestra from fill values and coverage"
+  },
+  "source": {
+    "provider": "NASA GES DISC / GPM",
+    "doi": "10.5067/GPM/IMERG/3B-MONTH/07",
+    "url": "https://disc.gsfc.nasa.gov/datasets/GPM_3IMERGM_07/summary",
+    "access": "NASA GES DISC GPM_3IMERGM V07B via Earthdata Cloud OPeNDAP (opendap.earthdata.nasa.gov, collection C2723754851-GES_DISC)",
+    "granules": 295,
+    "citation": "Huffman, G.J., E.F. Stocker, D.T. Bolvin, E.J. Nelkin, J. Tan (2023), GPM IMERG Final Precipitation L3 1 month 0.1 degree x 0.1 degree V07, Greenbelt, MD, Goddard Earth Sciences Data and Information Services Center (GES DISC), doi:10.5067/GPM/IMERG/3B-MONTH/07"
+  },
+  "preparation": {
+    "script": "pipeline/prepare_imerg.py",
+    "prepared": "2026-11-13T18:27:39+00:00",
+    "subset": {
+      "lonIndex": [
+        2960,
+        3074
+      ],
+      "latIndex": [
+        945,
+        1114
+      ]
+    },
+    "missingRule": "values equal to _FillValue -9999.9 or negative are missing; never converted to 0",
+    "boundaries": "Natural Earth 10m admin-0/admin-1 v5.1.2 (public domain)"
+  },
+  "assets": {
+    "regions": "regions.json",
+    "outline": "outline.json",
+    "validation": "validation.json"
+  }
+}

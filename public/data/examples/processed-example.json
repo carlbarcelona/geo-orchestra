@@ -1,0 +1,230 @@
+{
+ "format": "geoorchestra-processed",
+ "version": 1,
+ "datasetId": "imerg-v07b-manila-2023-2024",
+ "title": "IMERG V07B monthly precipitation \u2014 Manila cell, 2023\u20132024",
+ "variable": "precipitation",
+ "source": {
+  "provider": "NASA GES DISC GPM_3IMERGM V07B (exported by GeoOrchestra)",
+  "url": "https://disc.gsfc.nasa.gov/datasets/GPM_3IMERGM_07/summary",
+  "citation": "doi:10.5067/GPM/IMERG/3B-MONTH/07"
+ },
+ "records": [
+  {
+   "timestamp": "2023-01",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.307,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2023-02",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.087,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2023-03",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.016,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2023-04",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.128,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2023-05",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.213,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2023-06",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.424,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2023-07",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.895,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2023-08",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.514,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2023-09",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.529,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2023-10",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.344,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2023-11",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.207,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2023-12",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.205,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2024-01",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.066,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2024-02",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.021,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2024-03",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.049,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2024-04",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.006,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2024-05",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.28,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2024-06",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.33,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2024-07",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.744,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2024-08",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.419,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2024-09",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.753,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2024-10",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.544,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2024-11",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.152,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  },
+  {
+   "timestamp": "2024-12",
+   "latitude": 14.55,
+   "longitude": 120.95,
+   "value": 0.428,
+   "unit": "mm/hr",
+   "region": "Manila (sample cell)",
+   "quality_flag": "valid"
+  }
+ ]
+}

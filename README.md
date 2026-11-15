@@ -1,0 +1,98 @@
+# GeoOrchestra — the Earth Information Jukebox
+
+NASA Space Apps Challenge 2026 · *The Earth Information Jukebox*
+
+GeoOrchestra turns NASA precipitation measurements into sound you can inspect. It has two workspaces that share one project, one sound engine and **one playback clock**:
+
+| Workspace | What it shows | Data |
+| --- | --- | --- |
+| **Numerical** | Table · Map · Graph of monthly rainfall for the Philippines, Musical or Geophony sonification, a rolling piano roll | GPM IMERG Final Monthly **V07B**, 0.1°, **Jun 2000 – Dec 2024 (295 months, all verified)** |
+| **Visual feed** | Authentic NASA SVS / EIC frames of the IMERG daily precipitation climatology, synchronized with sound, graph and piano roll | NASA SVS **5478** (2001–2022 seasonal cycle, 366 dated days), linked to a **reconstructed** climatology |
+
+Every sound event records its date, its location or aggregation, the original value in mm/hr, and the mapping that produced it.
+
+## Run it
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm test           # 98 checks of the risky transformations
+npm run build && npm run preview
+```
+
+The prepared data is static under `public/data/`, so no backend or live NASA connection is needed at runtime.
+
+## Preset and Advanced mode
+
+A **Preset | Advanced** switch sits at the right of the Numerical | Visual feed bar. The choice is remembered in the browser and saved in project files.
+
+- **Preset** (the default for first-time visitors) shows the essentials:
+  - Numerical: a **Start listening** button (loads the NASA sample, selects the Philippines, plays from Jun 2000), region buttons, three listening presets, a "What you hear" guide, the graph with its normal line, and a "Now hearing" caption.
+  - Visual feed: one **Open NASA rainfall animation** button imports the frames, connects the climatology and plays.
+- **Advanced** is the full interface: instruments, scales, pitch range, every mapping and layer, metadata, coordinates, alignment evidence.
+
+**Time cues:** a knock marks each new year (Numerical) or each new month (Visual feed) in both Musical and Geophony. Press `C` to set a checkpoint, which plays a doubled knock. In Advanced you can choose the period, every N, the sounds and accents (see the mapping guide, `cue-v1`).
+
+Switching only changes which controls are shown, never the data or playback. The honesty labels (reconstructed linkage, seasonal average, image-derived) are shown in both modes.
+
+## Using it (demo path)
+
+1. **Numerical → NASA sample.** This loads 295 months. The Philippines land area is selected by default and shown as an area mean.
+2. Use **Table / Map / Graph**. Selecting a time anywhere moves the shared cursor in every view. Clicking a map cell pins a single 0.1° cell.
+3. Press **Space** to play Musical sonification. A soft hum plays the normal for that month (2001–2022), so a melody above the hum means wetter, below drier; a bell marks unusual months. Switch to **Geophony**, then click a note and open **Event details**.
+4. Use **Audio legend** to audition low, middle, high, zero and missing cases.
+5. In the **Visual feed**:
+   1. **Import visual feed**. The authentic SVS frames appear, but audio and graphs stay disabled.
+   2. **Connect climatology**. Its status shows *Reconstructed — approximate*.
+   3. Play, toggle **ROI**, and open **Frame alignment** to see the evidence.
+
+6. **Hear what a frame shows.**
+   - Press **S** (or **Sweep frame**) to play the frame as 11 beats from west to east: pitch = latitude (one fixed table), loudness = rain class, silence = dry.
+   - Focus the frame and use the arrow keys to explore it cell by cell.
+   - The **Describe** tab explains the frame in words and shows **braille charts** for refreshable braille displays.
+
+Keyboard: `Space` play/pause · `L` loop · `S` sweep · `C` checkpoint · `←/→` step · arrows on the frame explore · `Home/End` · `?`.
+
+## Data preparation (reproducible)
+
+```bash
+python -m venv pipeline/.venv && pipeline/.venv/Scripts/pip install numpy pillow shapely
+# 1. IMERG subset (needs your own Earthdata Login in ~/.netrc; see the script header)
+pipeline/.venv/Scripts/python pipeline/fetch_imerg_subset.py
+# 2. Natural Earth boundaries (public domain)
+curl -L -o data/raw/ne/admin0.geojson https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_admin_0_countries.geojson
+curl -L -o data/raw/ne/admin1.geojson https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_admin_1_states_provinces.geojson
+# 3. Build the packages
+pipeline/.venv/Scripts/python pipeline/prepare_imerg.py   # → public/data/imerg-ph + svs5478/climatology-ph.json
+pipeline/.venv/Scripts/python pipeline/prepare_svs.py     # → public/data/svs5478 (public SVS assets, ~800 MB cache)
+pipeline/.venv/Scripts/python pipeline/analyze_svs_frames.py  # → frame-scan.bin + frame-features.json (decode + validation)
+```
+
+Validation results are written to `public/data/imerg-ph/validation.json` and `public/data/svs5478/alignment.json`. See [docs/verification.md](docs/verification.md).
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before committing. Run `npm install` once to enable the git hooks, and `npm run check` before each commit.
+
+## Documentation
+
+- [docs/mapping-guide.md](docs/mapping-guide.md): how data becomes sound
+- [docs/processed-format.md](docs/processed-format.md): the JSON import format (example in `public/data/examples/`)
+- [docs/verification.md](docs/verification.md): what was checked and how
+- [docs/accessibility.md](docs/accessibility.md): accessibility provisions and limits
+- [docs/limitations.md](docs/limitations.md): known limitations and release status
+- [docs/demo-script.md](docs/demo-script.md): presentation walkthrough
+- [docs/attribution.md](docs/attribution.md): sources and credits
+
+## Architecture
+
+```
+pipeline/ (Python)  IMERG OPeNDAP subset → validate → area means + grid → static JSON/uint16
+                    SVS 5478 frames → date-overlay alignment → WebP derivatives + manifest
+src/contracts       dataset manifest · observation/selection · sound event · visual media manifest
+src/data            loaders (NASA sample, synthetic demo, processed JSON), aggregation
+src/playback        PlaybackController — the single Tone.js transport; monthly + seasonal adapters
+src/sound           mapping.ts (pure, deterministic) · engine.ts (instruments, geophony, channels)
+src/state           zustand store + actions (the only place views, controller and engine meet)
+src/ui              numerical / visual / shared components
+```

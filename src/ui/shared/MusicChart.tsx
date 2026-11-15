@@ -1,0 +1,405 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { SoundEvent } from '../../contracts';
+import { controller } from '../../playback/controller';
+import { midiToName } from '../../sound/mapping';
+import { comparePhrase, explainStep, rankPhrase } from '../../sound/context';
+import { useStore, set } from '../../state/store';
+import { jumpToCheckpoint, removeCheckpoint, seek, setSpeed, stepBy, toggleCheckpoint, togglePlay, toggleLoop } from '../../state/actions';
+import * as I from '../icons';
+import { useIsLight } from '../shell/theme';
+
+interface Props {
+  events: SoundEvent[][];
+  stepLabels: string[];       // observation axis labels, e.g. "Jan 2024" / "Jul 15"
+  axisTitle: string;          // e.g. "Observation month (UTC)"
+  cursor: number;
+  range: [number, number];
+  speeds: { value: number; label: string }[];
+  speed: number;
+  visibleSteps: number;
+  enabled: boolean;
+  emptyTitle: string;
+  emptyHint?: string;
+  rightInfo?: React.ReactNode;
+  footNote?: string;
+  score?: { label: string; node: React.ReactNode; available: boolean; events: SoundEvent[] };
+  /** label used in the "Now hearing" caption (defaults to the axis label of the step) */
+  captionLabel?: (i: number) => string;
+  /** checkpoint key of step i ("YYYY-MM" or "D###"), to show whether the cursor sits on a checkpoint */
+  checkpointKey?: (i: number) => string;
+}
+
+/** The ROI voice (scan-v4) in words, appended to the caption when it plays this step. */
+function roiCaption(events: SoundEvent[]): string {
+  const roi = events.find((e) => e.selectionId === 'roi' && e.kind === 'scan');
+  return roi?.original.value != null ? ` · your region: ${roi.original.value.toFixed(1)} mm/day (image-derived) → plucked ${roi.note}` : '';
+}
+
+const WET = '#38bdf8', DRY = '#fb923c';
+const isWet = (c?: string | null) => c === 'wetter' || c === 'much-wetter';
+const isDry = (c?: string | null) => c === 'drier' || c === 'much-drier';
+
+const LOW = 48, HIGH = 84; // C3..C6 display range
+const BLACK = new Set([1, 3, 6, 8, 10]);
+
+export function MusicChart(p: Props) {
+  const playback = useStore((s) => s.playback);
+  const loop = useStore((s) => s.loop);
+  const tab = useStore((s) => s.chartTab);
+  const selectedId = useStore((s) => s.selectedEventId);
+  const reduced = useStore((s) => s.a11y.reducedMotion);
+  const mode = useStore((s) => s.sound.mode);
+  const preset = useStore((s) => s.uiMode === 'preset');
+  const workspace = useStore((s) => s.tab);
+  const checkpoints = useStore((s) => s.checkpoints[s.tab]);
+  const light = useIsLight();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 800, h: 220 });
+  const hitRef = useRef<{ x: number; y: number; w: number; h: number; ev: SoundEvent }[]>([]);
+  const n = p.events.length;
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    setSize({ w: el.clientWidth, h: el.clientHeight });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [tab, p.enabled]);
+
+  const selected = useMemo(() => {
+    if (!selectedId) return null;
+    for (const step of p.events) for (const e of step) if (e.id === selectedId) return e;
+    for (const e of p.score?.events ?? []) if (e.id === selectedId) return e;
+    return null;
+  }, [selectedId, p.events, p.score?.events]);
+
+  useEffect(() => {
+    if (tab !== 'roll') return;
+    let raf = 0;
+    const draw = () => {
+      const cv = canvasRef.current;
+      if (!cv) return;
+      const dpr = window.devicePixelRatio || 1;
+      const W = size.w, H = size.h;
+      if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+      const ctx = cv.getContext('2d')!;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      const compact = W < 560;
+      const left = compact ? 76 : 128, keysW = compact ? 18 : 30, top = 48, bottom = 6;
+      const plotX = left + keysW, plotW = Math.max(80, W - plotX - 10);
+      const laneTex = 34, laneMark = 26, gap = 6;
+      const pitchH = Math.max(60, H - top - bottom - laneTex - laneMark - gap * 2);
+      const texY = top + pitchH + gap, markY = texY + laneTex + gap;
+      const visCap = compact ? Math.min(5, p.visibleSteps) : W < 760 ? Math.min(8, p.visibleSteps) : p.visibleSteps;
+      const V = Math.min(visCap, Math.max(1, n));
+      const prog = playback === 'playing' && !reduced ? controller.progress() : 0;
+      const head = p.cursor + prog;
+      let first = Math.max(0, Math.min(n - V, head - Math.floor(V * 0.25)));
+      if (reduced) first = Math.max(0, Math.min(n - V, Math.floor(p.cursor / V) * V));
+      const stepW = plotW / V;
+      const sx = (s: number) => plotX + (s - first) * stepW;
+      const py = (m: number) => top + ((HIGH - m) / (HIGH - LOW)) * (pitchH - 6) + 3;
+
+      const c = light ? {
+        bgMain: '#f8fafc', bgLane: '#f1f5f9', gridCol: '#e2e8f0', gridOct: '#cbd5e1',
+        labelMuted: '#475569', labelMain: '#0f172a', keyLabel: '#64748b',
+        keyBlack: '#334155', keyWhite: '#ffffff', keyStroke: '#cbd5e1',
+        refLine: 'rgba(15,23,42,0.55)', refLegend: '#0f172a', outRange: 'rgba(15,23,42,0.08)',
+        melody: '#6d28d9', melodyCur: '#7c3aed', sample: 'rgba(109,40,217,0.5)',
+        tex: 'rgba(13,148,136,0.38)', texCur: '#0d9488', drops: 'rgba(15,82,153,0.45)',
+        timeTick: '#0d9488', cp: '#b45309', ext: '#b45309', amber: '#b45309', danger: '#dc2626',
+        wet: '#0284c7', dry: '#c2410c', zero: '#b45309', year: '#6d28d9',
+      } : {
+        bgMain: '#0a1622', bgLane: '#0b1824', gridCol: '#1a2d40', gridOct: '#1f3448',
+        labelMuted: '#a9bccb', labelMain: '#d5e2ec', keyLabel: '#7890a3',
+        keyBlack: '#111', keyWhite: '#e9eef2', keyStroke: '',
+        refLine: 'rgba(230,238,245,0.75)', refLegend: '#e6eef5', outRange: 'rgba(0,0,0,0.35)',
+        melody: '#8b6ff0', melodyCur: '#c4b5fd', sample: 'rgba(167,139,250,0.55)',
+        tex: 'rgba(45,212,191,0.45)', texCur: '#5eead4', drops: 'rgba(200,240,255,0.55)',
+        timeTick: '#5eead4', cp: '#fbbf24', ext: '#fde68a', amber: '#f5b942', danger: '#f87171',
+        wet: WET, dry: DRY, zero: '#f5b942', year: '#a78bfa',
+      };
+
+      ctx.font = compact ? '11px Inter, sans-serif' : '12px Inter, sans-serif';
+      ctx.fillStyle = c.labelMuted;
+      ctx.fillText(compact ? 'Time' : 'Playback (s)', 10, 16);
+      ctx.fillText(compact ? 'Step' : p.axisTitle, 10, 38);
+      if (compact) {
+        ctx.fillText(mode === 'musical' ? 'Melody' : 'Muted', 10, top + pitchH / 2 - 4);
+      } else {
+        ctx.fillText('Rainfall', 12, top + pitchH / 2 - 4); ctx.fillText(mode === 'musical' ? 'melody' : 'melody (muted)', 12, top + pitchH / 2 + 12);
+      }
+      if ((p.events[p.cursor] ?? []).some((e) => e.kind === 'reference') || p.events.some((st) => st.some((e) => e.kind === 'reference'))) {
+        if (compact) {
+          ctx.fillStyle = c.wet; ctx.fillText('▲ wet', 10, top + pitchH / 2 + 16);
+          ctx.fillStyle = c.dry; ctx.fillText('▼ dry', 10, top + pitchH / 2 + 32);
+          ctx.fillStyle = c.labelMuted;
+        } else {
+          ctx.strokeStyle = c.refLegend; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(12, top + pitchH / 2 + 28); ctx.lineTo(34, top + pitchH / 2 + 28); ctx.stroke(); ctx.setLineDash([]);
+          ctx.fillText('normal (hum)', 40, top + pitchH / 2 + 32);
+          ctx.fillStyle = c.wet; ctx.fillText('▲ wetter', 12, top + pitchH / 2 + 50);
+          ctx.fillStyle = c.dry; ctx.fillText('▼ drier', 70, top + pitchH / 2 + 50);
+          ctx.fillStyle = c.labelMuted;
+        }
+      }
+      ctx.fillText(compact ? 'Texture' : 'Rain texture', 10, texY + laneTex / 2 + 4);
+      ctx.fillText(compact ? 'Markers' : 'Event markers', 10, markY + laneMark / 2 + 4);
+
+      // piano keys
+      for (let m = LOW; m <= HIGH; m++) {
+        const y0 = py(m + 0.5), y1 = py(m - 0.5);
+        ctx.fillStyle = BLACK.has(m % 12) ? c.keyBlack : c.keyWhite;
+        ctx.fillRect(left, y0, keysW - 4, Math.max(1, y1 - y0 - 0.5));
+        if (c.keyStroke && !BLACK.has(m % 12)) { ctx.strokeStyle = c.keyStroke; ctx.lineWidth = 0.5; ctx.strokeRect(left, y0, keysW - 4, Math.max(1, y1 - y0 - 0.5)); }
+        if (m % 12 === 0) { ctx.fillStyle = c.keyLabel; ctx.font = '10px JetBrains Mono, monospace'; ctx.fillText(midiToName(m), left - (compact ? 20 : 26), py(m) + 3); }
+      }
+      // grid + time axes
+      ctx.save();
+      ctx.beginPath(); ctx.rect(plotX, 0, plotW, H); ctx.clip();
+      ctx.fillStyle = c.bgMain; ctx.fillRect(plotX, top, plotW, pitchH);
+      ctx.fillStyle = c.bgLane; ctx.fillRect(plotX, texY, plotW, laneTex); ctx.fillRect(plotX, markY, plotW, laneMark);
+      const labelEvery = Math.max(1, Math.ceil(V / 12));
+      for (let s = Math.floor(first); s <= first + V + 1 && s < n; s++) {
+        const x = sx(s);
+        ctx.strokeStyle = c.gridCol; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, markY + laneMark); ctx.stroke();
+        if (s % labelEvery === 0) {
+          ctx.fillStyle = c.labelMuted; ctx.font = '11px JetBrains Mono, monospace';
+          const secs = (s - p.range[0]) / p.speed;
+          ctx.fillText(secs >= 0 ? (secs < 60 ? `${secs.toFixed(secs % 1 ? 1 : 0)}s` : `${Math.floor(secs / 60)}:${String(Math.round(secs % 60)).padStart(2, '0')}`) : '', x + 3, 16);
+          ctx.fillStyle = c.labelMain; ctx.font = '11.5px Inter, sans-serif';
+          ctx.fillText(p.stepLabels[s] ?? '', x + 3, 38);
+        }
+      }
+      for (let m = LOW; m <= HIGH; m += 12) { ctx.strokeStyle = c.gridOct; ctx.beginPath(); ctx.moveTo(plotX, py(m)); ctx.lineTo(plotX + plotW, py(m)); ctx.stroke(); }
+      // out-of-range shading
+      ctx.fillStyle = c.outRange;
+      if (p.range[0] > first) ctx.fillRect(plotX, top, sx(p.range[0]) - plotX, markY + laneMark - top);
+      if (p.range[1] + 1 < first + V) ctx.fillRect(sx(p.range[1] + 1), top, plotX + plotW - sx(p.range[1] + 1), markY + laneMark - top);
+
+      const hits: typeof hitRef.current = [];
+      for (let s = Math.max(0, Math.floor(first) - 1); s <= Math.min(n - 1, first + V + 1); s++) {
+        const isCur = s === p.cursor;
+        for (const ev of p.events[s] ?? []) {
+          const x = sx(s + ev.offset), w = Math.max(3, ev.duration * stepW - 2);
+          const sel = ev.id === selectedId;
+          if (ev.kind === 'reference' && ev.midi != null) {
+            const y = py(ev.midi);
+            ctx.strokeStyle = sel ? c.amber : c.refLine; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+            ctx.beginPath(); ctx.moveTo(sx(s) + 1, y); ctx.lineTo(sx(s + 1) - 1, y); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
+            hits.push({ x: sx(s), y: y - 3, w: stepW, h: 6, ev });
+          } else if (ev.kind === 'melody' && ev.midi != null) {
+            const y = py(ev.midi) - 4;
+            const cat = ev.context?.category;
+            ctx.fillStyle = sel ? c.amber : isCur ? c.melodyCur : c.melody;
+            ctx.globalAlpha = mode === 'musical' ? 1 : 0.4;
+            roundRect(ctx, x, y, w, 8, 2); ctx.fill();
+            if (isWet(cat) || isDry(cat)) { ctx.strokeStyle = isWet(cat) ? c.wet : c.dry; ctx.lineWidth = cat!.startsWith('much') ? 2.5 : 1.5; roundRect(ctx, x, y, w, 8, 2); ctx.stroke(); ctx.lineWidth = 1; }
+            if (ev.marker === 'clipped') { ctx.fillStyle = c.danger; ctx.fillRect(x + w - 3, y, 3, 8); }
+            if (stepW > 14 && (isWet(cat) || isDry(cat))) {
+              ctx.fillStyle = isWet(cat) ? c.wet : c.dry; ctx.font = '10px Inter, sans-serif';
+              ctx.fillText(isWet(cat) ? '▲' : '▼', x + 1, isWet(cat) ? y - 3 : y + 18);
+            }
+            ctx.globalAlpha = 1;
+            hits.push({ x, y: y - 2, w, h: 12, ev });
+          } else if (ev.kind === 'sample' && ev.midi != null) {
+            const y = py(ev.midi) - 2;
+            ctx.fillStyle = sel ? c.amber : c.sample;
+            ctx.globalAlpha = mode === 'musical' ? 1 : 0.35;
+            ctx.fillRect(x, y, Math.max(3, w), 4);
+            ctx.globalAlpha = 1;
+            hits.push({ x, y: y - 3, w: Math.max(5, w), h: 10, ev });
+          } else if (ev.kind === 'texture' && ev.texture) {
+            const h = Math.max(2, ev.texture.intensity * (laneTex - 6));
+            ctx.fillStyle = sel ? c.amber : isCur ? c.texCur : c.tex;
+            ctx.globalAlpha = mode === 'geophony' ? 1 : 0.45;
+            ctx.fillRect(sx(s) + 1, texY + laneTex - 3 - h, stepW - 2, h);
+            ctx.globalAlpha = 1;
+            // droplet dots: density
+            const dots = Math.min(14, Math.round(ev.texture.dropsPerSecond / 3));
+            ctx.fillStyle = c.drops;
+            for (let k = 0; k < dots; k++) ctx.fillRect(sx(s) + 2 + ((k * 37) % Math.max(4, stepW - 4)), texY + 3 + ((k * 13) % 10), 1.5, 1.5);
+            hits.push({ x: sx(s), y: texY, w: stepW, h: laneTex, ev });
+          } else if (ev.kind === 'marker') {
+            if (ev.marker === 'region' || ev.marker === 'clipped') continue;
+            if (ev.marker === 'time') {
+              // time cue: a thin tick across the marker lane (taller when accented)
+              const hgt = ev.timeCue?.accent === 'strong' ? laneMark - 4 : ev.timeCue?.accent === 'medium' ? laneMark - 9 : laneMark - 14;
+              ctx.fillStyle = sel ? c.amber : c.timeTick;
+              ctx.fillRect(sx(s), markY + laneMark - 2 - hgt, 2, hgt);
+              hits.push({ x: sx(s) - 2, y: markY, w: 6, h: laneMark, ev });
+              continue;
+            }
+            if (ev.marker === 'checkpoint') {
+              // checkpoint: a flag through the whole roll with its label
+              const fx = sx(s);
+              ctx.strokeStyle = sel ? c.amber : c.cp; ctx.lineWidth = 1.5; ctx.setLineDash([2, 3]);
+              ctx.beginPath(); ctx.moveTo(fx, top); ctx.lineTo(fx, markY + laneMark); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
+              ctx.fillStyle = c.cp;
+              ctx.beginPath(); ctx.moveTo(fx, markY + 3); ctx.lineTo(fx + 10, markY + 7); ctx.lineTo(fx, markY + 11); ctx.fill();
+              ctx.font = '10.5px Inter, sans-serif';
+              ctx.fillText((ev.timeCue?.label ?? '').slice(0, Math.max(4, Math.floor(stepW / 6))), fx + 12, markY + 12);
+              hits.push({ x: fx - 3, y: top, w: 14, h: markY + laneMark - top, ev });
+              continue;
+            }
+            if (ev.marker === 'extreme') {
+              ctx.fillStyle = sel ? c.amber : c.ext;
+              ctx.beginPath(); const cx = sx(s) + 10, cy = markY + laneMark / 2; ctx.moveTo(cx, cy - 6); ctx.lineTo(cx + 6, cy); ctx.lineTo(cx, cy + 6); ctx.lineTo(cx - 6, cy); ctx.fill();
+              if (stepW > 40) { ctx.font = '10px Inter, sans-serif'; ctx.fillText('unusual', sx(s) + 18, markY + 17); }
+              hits.push({ x: sx(s), y: markY, w: 20, h: laneMark, ev });
+              continue;
+            }
+            if (ev.marker === 'missing') {
+              ctx.fillStyle = 'rgba(248,113,113,0.12)'; ctx.fillRect(sx(s) + 1, top, stepW - 2, markY + laneMark - top);
+              ctx.strokeStyle = 'rgba(248,113,113,0.7)'; ctx.setLineDash([4, 3]); ctx.strokeRect(sx(s) + 1, top, stepW - 2, markY + laneMark - top); ctx.setLineDash([]);
+              ctx.fillStyle = c.danger; ctx.font = '11px Inter, sans-serif'; ctx.fillText('missing', sx(s) + 4, markY + 16);
+              hits.push({ x: sx(s), y: markY, w: stepW, h: laneMark, ev });
+            } else {
+              const col = ev.marker === 'zero' ? c.zero : c.year;
+              ctx.fillStyle = sel ? c.amber : col;
+              ctx.fillRect(sx(s) + 1, markY + 5, 4, laneMark - 10);
+              if (ev.marker === 'year' && stepW > 20) { ctx.font = '10px JetBrains Mono, monospace'; ctx.fillText(ev.original.t.slice(0, 4), sx(s) + 8, markY + 17); }
+              if (ev.marker === 'zero') { ctx.font = '10px Inter, sans-serif'; ctx.fillText('zero', sx(s) + 8, markY + 17); }
+              hits.push({ x: sx(s), y: markY, w: 8, h: laneMark, ev });
+            }
+          }
+        }
+      }
+      // playhead
+      const hx = sx(head);
+      ctx.strokeStyle = c.amber; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(hx, top - 6); ctx.lineTo(hx, markY + laneMark); ctx.stroke();
+      ctx.fillStyle = c.amber; ctx.beginPath(); ctx.moveTo(hx - 6, top - 10); ctx.lineTo(hx + 6, top - 10); ctx.lineTo(hx, top - 2); ctx.fill();
+      ctx.restore();
+      hitRef.current = hits;
+      if (playback === 'playing' && !reduced) raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => cancelAnimationFrame(raf);
+  }, [p.events, p.cursor, p.range, p.speed, p.visibleSteps, p.stepLabels, p.axisTitle, size, playback, reduced, selectedId, tab, n, mode, light]);
+
+  const onCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const hit = [...hitRef.current].reverse().find((h) => x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h);
+    if (hit) {
+      set({ selectedEventId: hit.ev.id });
+      if (playback === 'stopped') seek(hit.ev.stepIndex);
+    }
+  };
+
+  const curEvents = p.events[p.cursor] ?? [];
+  const primary = curEvents.find((e) => e.kind === 'melody') ?? curEvents.find((e) => e.kind === 'marker');
+  const caption = p.enabled && curEvents.some((e) => e.kind === 'melody' || e.kind === 'texture' || e.marker === 'missing')
+    ? explainStep(curEvents, mode, p.captionLabel?.(p.cursor) ?? p.stepLabels[p.cursor] ?? '') + roiCaption(curEvents) : '';
+  const rollLabel = caption ? `Piano roll. ${caption}` : primary ? `Piano roll. Current step ${p.stepLabels[p.cursor]}: ${primary.explanation}` : 'Piano roll';
+  const playing = playback !== 'stopped';
+  const capCat = (curEvents.find((e) => e.kind === 'melody') ?? curEvents.find((e) => e.kind === 'texture'))?.context?.category;
+
+  return (
+    <section className="panel span-all" aria-labelledby="chart-title" style={{ flex: 1 }}>
+      <div className="panel-head" style={{ flexWrap: 'wrap' }}>
+        <h2 className="panel-title" id="chart-title"><I.Note size={18} /> Music chart</h2>
+        <div className="seg" role="tablist" aria-label="Music chart view">
+          <button role="tab" aria-selected={tab === 'roll'} onClick={() => set({ chartTab: 'roll' })}>Piano roll</button>
+          {p.score && <button role="tab" aria-selected={tab === 'score'} onClick={() => set({ chartTab: 'score' })}>{p.score.label}</button>}
+          <button role="tab" aria-selected={tab === 'details'} onClick={() => set({ chartTab: 'details' })}>Event details</button>
+        </div>
+        <div className="spacer" />
+        <div className="row transport-bar" role="group" aria-label="Playback controls">
+          <button className="btn icon" onClick={() => stepBy(-1)} disabled={!p.enabled} aria-label="Previous observation"><I.Prev /></button>
+          <button className="btn play" onClick={() => void togglePlay()} disabled={!p.enabled} aria-label={playing ? 'Pause (Space)' : 'Play (Space)'} aria-pressed={playing}>
+            {playing ? <I.Pause /> : <I.Play />}
+          </button>
+          <button className="btn icon" onClick={() => stepBy(1)} disabled={!p.enabled} aria-label="Next observation"><I.Next /></button>
+          <button className={`btn ${loop ? 'active' : ''}`} onClick={toggleLoop} disabled={!p.enabled} aria-pressed={loop}><I.Loop /> Loop</button>
+          <label className="row"><span className="muted">Speed</span>
+            <select value={p.speed} onChange={(e) => setSpeed(Number(e.target.value))} disabled={!p.enabled} aria-label="Playback speed">
+              {p.speeds.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </label>
+          <button className={`btn small ${checkpoints.some((c) => (p.checkpointKey?.(p.cursor) ?? '') === c.key) ? 'active' : ''}`} onClick={() => toggleCheckpoint()} disabled={!p.enabled}
+            aria-keyshortcuts="C" title="Add or remove a checkpoint at the current step (C). A checkpoint plays a doubled knock when playback reaches it.">
+            ⚑ Checkpoint
+          </button>
+          {playback === 'buffering' && <span className="chip amber">Buffering…</span>}
+          {p.rightInfo}
+        </div>
+      </div>
+      {checkpoints.length > 0 && p.enabled && (
+        <div className="checkpoint-bar" role="list" aria-label={`Checkpoints in the ${workspace === 'numerical' ? 'Numerical' : 'Visual feed'} timeline`}>
+          <span className="caption-tag">Checkpoints</span>
+          {checkpoints.map((c) => (
+            <span className="cp-chip" role="listitem" key={c.key}>
+              <button className="cp-jump" onClick={() => jumpToCheckpoint(c.key)} title={`Jump to ${c.label}`}>⚑ {c.label}</button>
+              <button className="cp-x" onClick={() => removeCheckpoint(c.key)} aria-label={`Remove checkpoint ${c.label}`}><I.X size={11} /></button>
+            </span>
+          ))}
+        </div>
+      )}
+      {caption && (
+        <div className={`caption-strip ${preset ? 'big' : ''} ${isWet(capCat) ? 'wet' : isDry(capCat) ? 'dry' : ''}`} aria-live="off">
+          <span className="caption-tag">Now hearing</span>
+          <span className="caption-text">{caption}</span>
+        </div>
+      )}
+      {tab === 'score' && p.score ? (
+        <div className="chart-area" style={{ display: 'flex', flexDirection: 'column' }}>{p.score.node}</div>
+      ) : !p.enabled && !(tab === 'details' && selected) ? (
+        <div className="panel-body"><div className="empty"><I.Note size={30} style={{ color: 'var(--note)' }} /><div className="big">{p.emptyTitle}</div>{p.emptyHint && <div className="italic">{p.emptyHint}</div>}</div></div>
+      ) : tab === 'roll' ? (
+        <div className="chart-area" ref={wrapRef}>
+          <canvas ref={canvasRef} role="img" aria-label={rollLabel} onClick={onCanvasClick} style={{ cursor: 'pointer' }} />
+          {selected && (
+            <button className="chip amber" style={{ position: 'absolute', right: 14, top: 52, cursor: 'pointer' }} onClick={() => set({ chartTab: 'details' })}>
+              {selected.kind === 'texture' ? 'Rainfall → texture' : selected.kind === 'reference' ? 'Normal → hum' : selected.kind === 'chord' ? 'Wetter/drier → chord' : selected.kind === 'marker' ? 'Marker' : 'Rainfall → note'} · Inspect event
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="panel-body"><EventDetails selected={selected} current={curEvents} label={p.stepLabels[p.cursor]} /></div>
+      )}
+      {p.footNote && <div className="panel-foot" style={{ justifyContent: 'center' }}><span className="italic">{p.footNote}</span></div>}
+    </section>
+  );
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function EventDetails({ selected, current, label }: { selected: SoundEvent | null; current: SoundEvent[]; label: string }) {
+  const list = selected ? [selected] : current;
+  if (!list.length) return <div className="empty">No events at {label}.</div>;
+  return (
+    <div>
+      <p className="muted" style={{ marginTop: 0 }}>{selected ? 'Selected event' : `Events at the current step (${label}). Click a note in the piano roll to inspect it.`}
+        {selected && <button className="btn small ghost" onClick={() => set({ selectedEventId: null })}>Show current step</button>}</p>
+      <div className="event-details">
+        {list.map((e) => (
+          <dl className="kv" key={e.id} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: 10 }}>
+            <dt>Kind</dt><dd>{e.kind}{e.marker ? ` · ${e.marker}` : ''}</dd>
+            <dt>Observation</dt><dd>{e.original.label}</dd>
+            <dt>Original value</dt><dd>{e.original.value == null ? 'missing' : e.kind === 'feature' ? `rain band ${e.original.value.toFixed(2)}° latitude` : `${e.original.value.toFixed(4)} ${e.original.unit}`}</dd>
+            {e.original.derivation && <><dt>Derivation</dt><dd>{e.original.derivation}{e.original.derivation === 'image-derived' ? ' (decoded from NASA colorbar, approximate)' : ''}</dd></>}
+            {e.scan && e.kind === 'scan' && <><dt>Location</dt><dd>{e.scan.latBand ? `${e.scan.latBand[0]}…${e.scan.latBand[1]}°` : `${e.scan.lat}°`}, {e.scan.lon}°E{e.scan.beat != null ? ` · beat ${e.scan.beat + 1}` : ''}</dd></>}
+            {e.scan?.intensity && <><dt>Rain class</dt><dd>{e.scan.intensity}</dd></>}
+            {e.midi != null && <><dt>Note</dt><dd>{e.chord ? e.chord.map(midiToName).join(' ') : e.note} (MIDI {e.chord ? e.chord.join(',') : e.midi}) · vel {e.velocity}</dd></>}
+            {e.context?.normal != null && <><dt>Normal</dt><dd>{e.context.normal.toFixed(4)} mm/hr <span style={{ fontFamily: 'var(--font)' }}>({e.context.baseline})</span></dd></>}
+            {e.context?.anomaly != null && <><dt>Compared</dt><dd style={{ fontFamily: 'var(--font)' }}>{e.context.anomaly >= 0 ? '+' : ''}{e.context.anomaly.toFixed(4)} mm/hr{e.context.z != null ? ` · z ${e.context.z.toFixed(2)}` : ''} · {comparePhrase(e.context)}{rankPhrase(e.context) ? ` · ${rankPhrase(e.context)}` : ''}</dd></>}
+            {e.pan != null && e.kind === 'sample' && <><dt>Stereo pan</dt><dd>{e.pan}</dd></>}
+            {e.timeCue && <><dt>Time cue</dt><dd style={{ fontFamily: 'var(--font)' }}>{e.timeCue.unit === 'checkpoint' ? `checkpoint “${e.timeCue.label}”` : e.timeCue.label} · {e.timeCue.sound}{e.timeCue.accent !== 'normal' ? ` · ${e.timeCue.accent}` : ''}</dd></>}
+            {e.texture && <><dt>Texture</dt><dd>{e.texture.dropsPerSecond} drops/s · intensity {e.texture.intensity}</dd></>}
+            <dt>Selection</dt><dd>{e.selectionId}</dd>
+            <dt>Sources</dt><dd style={{ wordBreak: 'break-all' }}>{e.sourceObservationIds.join(', ')}</dd>
+            <dt>Mapping</dt><dd>{e.mappingVersion}</dd>
+            <dt>Explanation</dt><dd style={{ fontFamily: 'var(--font)' }}>{e.explanation}</dd>
+          </dl>
+        ))}
+      </div>
+    </div>
+  );
+}

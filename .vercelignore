@@ -1,0 +1,6 @@
+data/raw
+pipeline/.venv
+node_modules
+dist
+*.jpg
+demo-video

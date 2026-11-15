@@ -1,0 +1,16 @@
+{
+ "start": -1,
+ "marks": {
+  "musical": 0.5,
+  "geophony": 11,
+  "musical2": 18,
+  "muteMelody": 20.5,
+  "unmuteMelody": 25,
+  "pause": 27.5,
+  "visual": 28,
+  "sweep": 34,
+  "roi": 46,
+  "roiSweep": 49,
+  "end": 59
+ }
+}

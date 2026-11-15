@@ -9,3 +9,4 @@ write one. Each line below gives a note's title, then why someone would open it.
 - [YouTube pages give titles only](youtube-pages-give-titles-only.md): what an agent can and can't learn from a shared video link.
 - [Preset time-cue convention](preset-time-cue-convention.md): the fixed Preset knock (year / month, doubled for checkpoints) and where to change cues.
 - [Hooks before the Preset early return](hooks-before-preset-return.md): why the Preset → Advanced switch once blanked the app, and how to write mode variants.
+- [Briefing is mandatory in Preset](briefing-mandatory-in-preset.md): the spoken pre-playback briefing, what must stay in it, and where to add a new sound.

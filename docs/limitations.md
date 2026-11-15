@@ -24,3 +24,4 @@ Other notes:
 - "Normal" needs at least 5 valid years of a calendar month within 2001–2022. The synthetic demo and short imports have no normal, so they play the amount only (the caption says so).
 - Wetter/drier categories and the "unusual" bell are listening aids computed from the measurements. They are not new measurements and are not attributed to any cause (for example ENSO).
 - Narration depends on the browser's speech engine and voices.
+- The briefing's word highlight follows the voice's word events. Some voices (several network voices in Chrome) send none; the highlight then follows an estimated reading speed and can drift from the voice by a word or two.

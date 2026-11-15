@@ -110,6 +110,10 @@ Presets are bundles of the settings above. They never change data.
 | Visual feed | Rain amount only | no band voice |
 | Visual feed | Rain sounds | Geophony + band voice |
 
+### Session briefing
+
+Before the first playback (always in Preset, by default in Advanced) a spoken briefing explains each sound that is on, with the same examples as the Audio legend (`legendEvents`), the time-cue preview and, in the Visual feed, a south → north rain-band glide. The script is `briefingScript()` in `src/a11y/briefing.ts`. It plays no new mapping and changes no data, so `MAPPING.version` is unchanged.
+
 ## Time cues and checkpoints (`cue-v1`)
 
 Time cues mark the **timeline**, not the data. They are short percussive sounds at the start of a period, so a listener can tell how far playback has gone.

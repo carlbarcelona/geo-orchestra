@@ -15,6 +15,14 @@
   - `C` adds or removes a checkpoint at the current step, and each change is announced.
   - The checkpoint list in Advanced has labelled inputs and jump and remove buttons.
   - Checkpoint labels appear in the caption and are spoken during playback when narration is on.
+- **Session briefing (before the music):** a spoken introduction names each sound that will play, plays an example of it, and says what "higher", "louder" and "more" mean.
+  - A modal shows the sentence being read and highlights each word as the voice reaches it; read words stay bright. "Read the whole briefing" lists every part as text.
+  - It is built from the live settings, so it never describes a sound that is off or muted. It always says that missing is not zero and that the sounds are not recordings.
+  - Preset mode: mandatory before the first playback in each workspace, and again when the sounds change (another listening preset or sound mode). It cannot be skipped, but it can be paused (Esc or the Pause button) and a part replayed.
+  - Advanced mode: on by default; Skip briefing (or Esc), and a switch in the modal or the Accessibility dialog turns it off.
+  - Without a browser voice, or with a voice that reports no word positions, the words advance on a timer so the highlight still paces the briefing.
+  - "Replay briefing" under the Audio legend button hears it again at any time.
+- **Resizable panels:** drag the gaps between panels, or the music chart's top edge. Each handle is focusable: arrows move 16 px (Shift 64), Home/End go to the limits, Enter or a double-click resets. Sizes are clamped so controls stay readable, and narrow panels stack each label above its control. "Reset layout" in the status bar restores the defaults.
 - **Colour is never the only cue:** wetter and drier notes also carry ▲ / ▼, and the caption says it in words.
 - **Display options:** Reduced motion (the piano roll moves step by step; this follows `prefers-reduced-motion` by default), High contrast, and Larger text.
 - **Audio:**

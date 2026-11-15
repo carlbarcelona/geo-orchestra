@@ -3,6 +3,7 @@ import type { AlignmentEvidence, ClimatologyLinkage, FrameScanDoc, Selection, Vi
 import type { Dataset } from '../data/dataset';
 import type { InstrumentId, LayerLevels, SoundMode } from '../sound/engine';
 import { DEFAULT_PRESET, type ListeningPresetId } from '../sound/presets';
+import type { BriefSegment } from '../a11y/briefing';
 import { PRESET_TIME_CUES, type Checkpoint, type TimeCueSettings } from '../sound/timeCues';
 
 export type Tab = 'numerical' | 'visual';
@@ -31,7 +32,9 @@ export interface SoundSettings {
   variation: boolean;   // change → extra notes
 }
 
-export interface A11ySettings { reducedMotion: boolean; highContrast: boolean; largeText: boolean; announceSteps: boolean; brailleCharts: boolean; describeEvery: number; haptics: boolean; speak: boolean }
+export interface A11ySettings { reducedMotion: boolean; highContrast: boolean; largeText: boolean; announceSteps: boolean; brailleCharts: boolean; describeEvery: number; haptics: boolean; speak: boolean;
+  /** Advanced mode: brief the listener before playback (Preset always does). */
+  briefAdvanced: boolean }
 
 export interface AppState {
   tab: Tab;
@@ -73,6 +76,10 @@ export interface AppState {
   a11y: A11ySettings;
   dialogs: { a11y: boolean; legend: boolean; sources: boolean; shortcuts: boolean };
   announcement: { text: string; id: number };
+  /** The briefing in progress (null = none). */
+  briefing: { tab: Tab; script: BriefSegment[]; segment: number; word: number; phase: 'speaking' | 'example'; paused: boolean } | null;
+  /** Signature of the briefing already heard per workspace in this page session (see a11y/briefing.ts). */
+  briefed: Record<Tab, string>;
   /** Bumped whenever the generated sound events change (the events themselves are cached in actions.ts). */
   eventsRev: number;
   lag: { max: number; mean: number; samples: number };
@@ -122,9 +129,11 @@ export const useStore = create<AppState>(() => ({
   media: { state: 'none', message: '', manifest: null, alignment: null },
   link: { state: 'none', message: '', climatology: null },
   visual: { day: 0, mode: 'timelapse', roi: false, fit: 'fit', regionId: 'philippines', speed: 10, fullscreen: false, crop: null, cropping: false },
-  a11y: { reducedMotion: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches, highContrast: false, largeText: false, announceSteps: false, brailleCharts: true, describeEvery: 15, haptics: true, speak: false },
+  a11y: { reducedMotion: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches, highContrast: false, largeText: false, announceSteps: false, brailleCharts: true, describeEvery: 15, haptics: true, speak: false, briefAdvanced: true },
   dialogs: { a11y: false, legend: false, sources: false, shortcuts: false },
   announcement: { text: '', id: 0 },
+  briefing: null,
+  briefed: { numerical: '', visual: '' },
   eventsRev: 0,
   lag: { max: 0, mean: 0, samples: 0 },
 }));

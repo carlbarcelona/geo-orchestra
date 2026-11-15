@@ -1,5 +1,9 @@
 # Demo video (NASA Space Apps, 30 s)
 
+**Watch it:** [`geoorchestra-demo.mp4`](geoorchestra-demo.mp4), the 29.97 s cut (a review copy, re-encoded to stay
+under the repo's 15 MB file limit). Upload the full-quality render (`out/geoorchestra-demo.mp4`, made by the steps
+below) for the Space Apps submission.
+
 Real app footage and real app audio, edited in Remotion. Nothing is re-created: every frame and sound comes
 from the production build.
 

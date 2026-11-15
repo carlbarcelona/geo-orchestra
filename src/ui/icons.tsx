@@ -46,11 +46,18 @@ export const Filter = ({ size, ...p }: P) => <svg {...base(size)} {...p}><path d
 export const Columns = ({ size, ...p }: P) => <svg {...base(size)} {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16M15 4v16" /></svg>;
 export const Trash = ({ size, ...p }: P) => <svg {...base(size)} {...p}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>;
 
-export function Logo({ size = 38 }: { size?: number }) {
+export const Sun = ({ size, ...p }: P) => <svg {...base(size)} {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" /></svg>;
+export const Moon = ({ size, ...p }: P) => <svg {...base(size)} {...p}><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></svg>;
+
+/** Line-drawn globe with an orbit and a sound wave crossing it. Uses currentColor so it follows the theme. */
+export function Logo({ size = 34 }: { size?: number }) {
   return (
-    <svg width={size * 1.6} height={size} viewBox="0 0 64 40" aria-hidden="true">
-      <ellipse cx="32" cy="20" rx="20" ry="17" fill="none" stroke="#2dd4bf" strokeOpacity="0.55" strokeWidth="2.2" />
-      <path d="M2 22c6-9 11-9 16 0s11 9 16 0 11-9 16 0 8 6 12 2" fill="none" stroke="#2dd4bf" strokeWidth="3" strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 40 40" aria-hidden="true" className="logo" fill="none" stroke="currentColor">
+      <circle cx="20" cy="20" r="11" strokeWidth="1.4" />
+      <path d="M9 20h22M20 9c-4 3.2-4 18.8 0 22M20 9c4 3.2 4 18.8 0 22" strokeWidth="0.9" strokeOpacity="0.55" />
+      <ellipse cx="20" cy="20" rx="18.5" ry="6.5" transform="rotate(-22 20 20)" strokeWidth="1.2" strokeDasharray="2.2 2.2" />
+      <path d="M6 21.5c2.2-3.6 4.2-3.6 6.2 0s4.2 3.6 6.2 0 4.2-3.6 6.2 0 4.2 3.6 6.2 0 2.7-2.4 3.7-1" strokeWidth="2" strokeLinecap="round" className="logo-wave" />
+      <circle cx="35.2" cy="13.6" r="1.6" fill="currentColor" stroke="none" />
     </svg>
   );
 }

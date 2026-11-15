@@ -6,6 +6,7 @@ import { comparePhrase, explainStep, rankPhrase } from '../../sound/context';
 import { useStore, set } from '../../state/store';
 import { jumpToCheckpoint, removeCheckpoint, seek, setSpeed, stepBy, toggleCheckpoint, togglePlay, toggleLoop } from '../../state/actions';
 import * as I from '../icons';
+import { useIsLight } from '../shell/theme';
 
 interface Props {
   events: SoundEvent[][];
@@ -51,6 +52,7 @@ export function MusicChart(p: Props) {
   const preset = useStore((s) => s.uiMode === 'preset');
   const workspace = useStore((s) => s.tab);
   const checkpoints = useStore((s) => s.checkpoints[s.tab]);
+  const light = useIsLight();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 220 });
@@ -99,17 +101,37 @@ export function MusicChart(p: Props) {
       const sx = (s: number) => plotX + (s - first) * stepW;
       const py = (m: number) => top + ((HIGH - m) / (HIGH - LOW)) * (pitchH - 6) + 3;
 
+      const c = light ? {
+        bgMain: '#f8fafc', bgLane: '#f1f5f9', gridCol: '#e2e8f0', gridOct: '#cbd5e1',
+        labelMuted: '#475569', labelMain: '#0f172a', keyLabel: '#64748b',
+        keyBlack: '#334155', keyWhite: '#ffffff', keyStroke: '#cbd5e1',
+        refLine: 'rgba(15,23,42,0.55)', refLegend: '#0f172a', outRange: 'rgba(15,23,42,0.08)',
+        melody: '#6d28d9', melodyCur: '#7c3aed', sample: 'rgba(109,40,217,0.5)',
+        tex: 'rgba(13,148,136,0.38)', texCur: '#0d9488', drops: 'rgba(15,82,153,0.45)',
+        timeTick: '#0d9488', cp: '#b45309', ext: '#b45309', amber: '#b45309', danger: '#dc2626',
+        wet: '#0284c7', dry: '#c2410c', zero: '#b45309', year: '#6d28d9',
+      } : {
+        bgMain: '#0a1622', bgLane: '#0b1824', gridCol: '#1a2d40', gridOct: '#1f3448',
+        labelMuted: '#a9bccb', labelMain: '#d5e2ec', keyLabel: '#7890a3',
+        keyBlack: '#111', keyWhite: '#e9eef2', keyStroke: '',
+        refLine: 'rgba(230,238,245,0.75)', refLegend: '#e6eef5', outRange: 'rgba(0,0,0,0.35)',
+        melody: '#8b6ff0', melodyCur: '#c4b5fd', sample: 'rgba(167,139,250,0.55)',
+        tex: 'rgba(45,212,191,0.45)', texCur: '#5eead4', drops: 'rgba(200,240,255,0.55)',
+        timeTick: '#5eead4', cp: '#fbbf24', ext: '#fde68a', amber: '#f5b942', danger: '#f87171',
+        wet: WET, dry: DRY, zero: '#f5b942', year: '#a78bfa',
+      };
+
       ctx.font = '12px Inter, sans-serif';
-      ctx.fillStyle = '#a9bccb';
+      ctx.fillStyle = c.labelMuted;
       ctx.fillText('Playback (s)', 12, 16);
       ctx.fillText(p.axisTitle, 12, 38);
       ctx.fillText('Rainfall', 12, top + pitchH / 2 - 4); ctx.fillText(mode === 'musical' ? 'melody' : 'melody (muted)', 12, top + pitchH / 2 + 12);
       if ((p.events[p.cursor] ?? []).some((e) => e.kind === 'reference') || p.events.some((st) => st.some((e) => e.kind === 'reference'))) {
-        ctx.strokeStyle = '#e6eef5'; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(12, top + pitchH / 2 + 28); ctx.lineTo(34, top + pitchH / 2 + 28); ctx.stroke(); ctx.setLineDash([]);
+        ctx.strokeStyle = c.refLegend; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(12, top + pitchH / 2 + 28); ctx.lineTo(34, top + pitchH / 2 + 28); ctx.stroke(); ctx.setLineDash([]);
         ctx.fillText('normal (hum)', 40, top + pitchH / 2 + 32);
-        ctx.fillStyle = WET; ctx.fillText('▲ wetter', 12, top + pitchH / 2 + 50);
-        ctx.fillStyle = DRY; ctx.fillText('▼ drier', 70, top + pitchH / 2 + 50);
-        ctx.fillStyle = '#a9bccb';
+        ctx.fillStyle = c.wet; ctx.fillText('▲ wetter', 12, top + pitchH / 2 + 50);
+        ctx.fillStyle = c.dry; ctx.fillText('▼ drier', 70, top + pitchH / 2 + 50);
+        ctx.fillStyle = c.labelMuted;
       }
       ctx.fillText('Rain texture', 12, texY + laneTex / 2 + 4);
       ctx.fillText('Event markers', 12, markY + laneMark / 2 + 4);
@@ -117,31 +139,32 @@ export function MusicChart(p: Props) {
       // piano keys
       for (let m = LOW; m <= HIGH; m++) {
         const y0 = py(m + 0.5), y1 = py(m - 0.5);
-        ctx.fillStyle = BLACK.has(m % 12) ? '#111' : '#e9eef2';
+        ctx.fillStyle = BLACK.has(m % 12) ? c.keyBlack : c.keyWhite;
         ctx.fillRect(left, y0, keysW - 6, Math.max(1, y1 - y0 - 0.5));
-        if (m % 12 === 0) { ctx.fillStyle = '#7890a3'; ctx.font = '10px JetBrains Mono, monospace'; ctx.fillText(midiToName(m), left - 26, py(m) + 3); }
+        if (c.keyStroke && !BLACK.has(m % 12)) { ctx.strokeStyle = c.keyStroke; ctx.lineWidth = 0.5; ctx.strokeRect(left, y0, keysW - 6, Math.max(1, y1 - y0 - 0.5)); }
+        if (m % 12 === 0) { ctx.fillStyle = c.keyLabel; ctx.font = '10px JetBrains Mono, monospace'; ctx.fillText(midiToName(m), left - 26, py(m) + 3); }
       }
       // grid + time axes
       ctx.save();
       ctx.beginPath(); ctx.rect(plotX, 0, plotW, H); ctx.clip();
-      ctx.fillStyle = '#0a1622'; ctx.fillRect(plotX, top, plotW, pitchH);
-      ctx.fillStyle = '#0b1824'; ctx.fillRect(plotX, texY, plotW, laneTex); ctx.fillRect(plotX, markY, plotW, laneMark);
+      ctx.fillStyle = c.bgMain; ctx.fillRect(plotX, top, plotW, pitchH);
+      ctx.fillStyle = c.bgLane; ctx.fillRect(plotX, texY, plotW, laneTex); ctx.fillRect(plotX, markY, plotW, laneMark);
       const labelEvery = Math.max(1, Math.ceil(V / 12));
       for (let s = Math.floor(first); s <= first + V + 1 && s < n; s++) {
         const x = sx(s);
-        ctx.strokeStyle = '#1a2d40'; ctx.lineWidth = 1;
+        ctx.strokeStyle = c.gridCol; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, markY + laneMark); ctx.stroke();
         if (s % labelEvery === 0) {
-          ctx.fillStyle = '#a9bccb'; ctx.font = '11px JetBrains Mono, monospace';
+          ctx.fillStyle = c.labelMuted; ctx.font = '11px JetBrains Mono, monospace';
           const secs = (s - p.range[0]) / p.speed;
           ctx.fillText(secs >= 0 ? (secs < 60 ? `${secs.toFixed(secs % 1 ? 1 : 0)}s` : `${Math.floor(secs / 60)}:${String(Math.round(secs % 60)).padStart(2, '0')}`) : '', x + 3, 16);
-          ctx.fillStyle = '#d5e2ec'; ctx.font = '11.5px Inter, sans-serif';
+          ctx.fillStyle = c.labelMain; ctx.font = '11.5px Inter, sans-serif';
           ctx.fillText(p.stepLabels[s] ?? '', x + 3, 38);
         }
       }
-      for (let m = LOW; m <= HIGH; m += 12) { ctx.strokeStyle = '#1f3448'; ctx.beginPath(); ctx.moveTo(plotX, py(m)); ctx.lineTo(plotX + plotW, py(m)); ctx.stroke(); }
+      for (let m = LOW; m <= HIGH; m += 12) { ctx.strokeStyle = c.gridOct; ctx.beginPath(); ctx.moveTo(plotX, py(m)); ctx.lineTo(plotX + plotW, py(m)); ctx.stroke(); }
       // out-of-range shading
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillStyle = c.outRange;
       if (p.range[0] > first) ctx.fillRect(plotX, top, sx(p.range[0]) - plotX, markY + laneMark - top);
       if (p.range[1] + 1 < first + V) ctx.fillRect(sx(p.range[1] + 1), top, plotX + plotW - sx(p.range[1] + 1), markY + laneMark - top);
 
@@ -153,39 +176,39 @@ export function MusicChart(p: Props) {
           const sel = ev.id === selectedId;
           if (ev.kind === 'reference' && ev.midi != null) {
             const y = py(ev.midi);
-            ctx.strokeStyle = sel ? '#f5b942' : 'rgba(230,238,245,0.75)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+            ctx.strokeStyle = sel ? c.amber : c.refLine; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
             ctx.beginPath(); ctx.moveTo(sx(s) + 1, y); ctx.lineTo(sx(s + 1) - 1, y); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
             hits.push({ x: sx(s), y: y - 3, w: stepW, h: 6, ev });
           } else if (ev.kind === 'melody' && ev.midi != null) {
             const y = py(ev.midi) - 4;
             const cat = ev.context?.category;
-            ctx.fillStyle = sel ? '#f5b942' : isCur ? '#c4b5fd' : '#8b6ff0';
+            ctx.fillStyle = sel ? c.amber : isCur ? c.melodyCur : c.melody;
             ctx.globalAlpha = mode === 'musical' ? 1 : 0.4;
             roundRect(ctx, x, y, w, 8, 2); ctx.fill();
-            if (isWet(cat) || isDry(cat)) { ctx.strokeStyle = isWet(cat) ? WET : DRY; ctx.lineWidth = cat!.startsWith('much') ? 2.5 : 1.5; roundRect(ctx, x, y, w, 8, 2); ctx.stroke(); ctx.lineWidth = 1; }
-            if (ev.marker === 'clipped') { ctx.fillStyle = '#f87171'; ctx.fillRect(x + w - 3, y, 3, 8); }
+            if (isWet(cat) || isDry(cat)) { ctx.strokeStyle = isWet(cat) ? c.wet : c.dry; ctx.lineWidth = cat!.startsWith('much') ? 2.5 : 1.5; roundRect(ctx, x, y, w, 8, 2); ctx.stroke(); ctx.lineWidth = 1; }
+            if (ev.marker === 'clipped') { ctx.fillStyle = c.danger; ctx.fillRect(x + w - 3, y, 3, 8); }
             if (stepW > 14 && (isWet(cat) || isDry(cat))) {
-              ctx.fillStyle = isWet(cat) ? WET : DRY; ctx.font = '10px Inter, sans-serif';
+              ctx.fillStyle = isWet(cat) ? c.wet : c.dry; ctx.font = '10px Inter, sans-serif';
               ctx.fillText(isWet(cat) ? '▲' : '▼', x + 1, isWet(cat) ? y - 3 : y + 18);
             }
             ctx.globalAlpha = 1;
             hits.push({ x, y: y - 2, w, h: 12, ev });
           } else if (ev.kind === 'sample' && ev.midi != null) {
             const y = py(ev.midi) - 2;
-            ctx.fillStyle = sel ? '#f5b942' : 'rgba(167,139,250,0.55)';
+            ctx.fillStyle = sel ? c.amber : c.sample;
             ctx.globalAlpha = mode === 'musical' ? 1 : 0.35;
             ctx.fillRect(x, y, Math.max(3, w), 4);
             ctx.globalAlpha = 1;
             hits.push({ x, y: y - 3, w: Math.max(5, w), h: 10, ev });
           } else if (ev.kind === 'texture' && ev.texture) {
             const h = Math.max(2, ev.texture.intensity * (laneTex - 6));
-            ctx.fillStyle = sel ? '#f5b942' : isCur ? '#5eead4' : 'rgba(45,212,191,0.45)';
+            ctx.fillStyle = sel ? c.amber : isCur ? c.texCur : c.tex;
             ctx.globalAlpha = mode === 'geophony' ? 1 : 0.45;
             ctx.fillRect(sx(s) + 1, texY + laneTex - 3 - h, stepW - 2, h);
             ctx.globalAlpha = 1;
             // droplet dots: density
             const dots = Math.min(14, Math.round(ev.texture.dropsPerSecond / 3));
-            ctx.fillStyle = 'rgba(200,240,255,0.55)';
+            ctx.fillStyle = c.drops;
             for (let k = 0; k < dots; k++) ctx.fillRect(sx(s) + 2 + ((k * 37) % Math.max(4, stepW - 4)), texY + 3 + ((k * 13) % 10), 1.5, 1.5);
             hits.push({ x: sx(s), y: texY, w: stepW, h: laneTex, ev });
           } else if (ev.kind === 'marker') {
@@ -193,7 +216,7 @@ export function MusicChart(p: Props) {
             if (ev.marker === 'time') {
               // time cue: a thin tick across the marker lane (taller when accented)
               const hgt = ev.timeCue?.accent === 'strong' ? laneMark - 4 : ev.timeCue?.accent === 'medium' ? laneMark - 9 : laneMark - 14;
-              ctx.fillStyle = sel ? '#f5b942' : '#5eead4';
+              ctx.fillStyle = sel ? c.amber : c.timeTick;
               ctx.fillRect(sx(s), markY + laneMark - 2 - hgt, 2, hgt);
               hits.push({ x: sx(s) - 2, y: markY, w: 6, h: laneMark, ev });
               continue;
@@ -201,9 +224,9 @@ export function MusicChart(p: Props) {
             if (ev.marker === 'checkpoint') {
               // checkpoint: a flag through the whole roll with its label
               const fx = sx(s);
-              ctx.strokeStyle = sel ? '#f5b942' : '#fbbf24'; ctx.lineWidth = 1.5; ctx.setLineDash([2, 3]);
+              ctx.strokeStyle = sel ? c.amber : c.cp; ctx.lineWidth = 1.5; ctx.setLineDash([2, 3]);
               ctx.beginPath(); ctx.moveTo(fx, top); ctx.lineTo(fx, markY + laneMark); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
-              ctx.fillStyle = '#fbbf24';
+              ctx.fillStyle = c.cp;
               ctx.beginPath(); ctx.moveTo(fx, markY + 3); ctx.lineTo(fx + 10, markY + 7); ctx.lineTo(fx, markY + 11); ctx.fill();
               ctx.font = '10.5px Inter, sans-serif';
               ctx.fillText((ev.timeCue?.label ?? '').slice(0, Math.max(4, Math.floor(stepW / 6))), fx + 12, markY + 12);
@@ -211,7 +234,7 @@ export function MusicChart(p: Props) {
               continue;
             }
             if (ev.marker === 'extreme') {
-              ctx.fillStyle = sel ? '#f5b942' : '#fde68a';
+              ctx.fillStyle = sel ? c.amber : c.ext;
               ctx.beginPath(); const cx = sx(s) + 10, cy = markY + laneMark / 2; ctx.moveTo(cx, cy - 6); ctx.lineTo(cx + 6, cy); ctx.lineTo(cx, cy + 6); ctx.lineTo(cx - 6, cy); ctx.fill();
               if (stepW > 40) { ctx.font = '10px Inter, sans-serif'; ctx.fillText('unusual', sx(s) + 18, markY + 17); }
               hits.push({ x: sx(s), y: markY, w: 20, h: laneMark, ev });
@@ -220,11 +243,11 @@ export function MusicChart(p: Props) {
             if (ev.marker === 'missing') {
               ctx.fillStyle = 'rgba(248,113,113,0.12)'; ctx.fillRect(sx(s) + 1, top, stepW - 2, markY + laneMark - top);
               ctx.strokeStyle = 'rgba(248,113,113,0.7)'; ctx.setLineDash([4, 3]); ctx.strokeRect(sx(s) + 1, top, stepW - 2, markY + laneMark - top); ctx.setLineDash([]);
-              ctx.fillStyle = '#f87171'; ctx.font = '11px Inter, sans-serif'; ctx.fillText('missing', sx(s) + 4, markY + 16);
+              ctx.fillStyle = c.danger; ctx.font = '11px Inter, sans-serif'; ctx.fillText('missing', sx(s) + 4, markY + 16);
               hits.push({ x: sx(s), y: markY, w: stepW, h: laneMark, ev });
             } else {
-              const col = ev.marker === 'zero' ? '#f5b942' : '#a78bfa';
-              ctx.fillStyle = sel ? '#f5b942' : col;
+              const col = ev.marker === 'zero' ? c.zero : c.year;
+              ctx.fillStyle = sel ? c.amber : col;
               ctx.fillRect(sx(s) + 1, markY + 5, 4, laneMark - 10);
               if (ev.marker === 'year' && stepW > 20) { ctx.font = '10px JetBrains Mono, monospace'; ctx.fillText(ev.original.t.slice(0, 4), sx(s) + 8, markY + 17); }
               if (ev.marker === 'zero') { ctx.font = '10px Inter, sans-serif'; ctx.fillText('zero', sx(s) + 8, markY + 17); }
@@ -235,16 +258,16 @@ export function MusicChart(p: Props) {
       }
       // playhead
       const hx = sx(head);
-      ctx.strokeStyle = '#f5b942'; ctx.lineWidth = 2;
+      ctx.strokeStyle = c.amber; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(hx, top - 6); ctx.lineTo(hx, markY + laneMark); ctx.stroke();
-      ctx.fillStyle = '#f5b942'; ctx.beginPath(); ctx.moveTo(hx - 6, top - 10); ctx.lineTo(hx + 6, top - 10); ctx.lineTo(hx, top - 2); ctx.fill();
+      ctx.fillStyle = c.amber; ctx.beginPath(); ctx.moveTo(hx - 6, top - 10); ctx.lineTo(hx + 6, top - 10); ctx.lineTo(hx, top - 2); ctx.fill();
       ctx.restore();
       hitRef.current = hits;
       if (playback === 'playing' && !reduced) raf = requestAnimationFrame(draw);
     };
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [p.events, p.cursor, p.range, p.speed, p.visibleSteps, p.stepLabels, p.axisTitle, size, playback, reduced, selectedId, tab, n, mode]);
+  }, [p.events, p.cursor, p.range, p.speed, p.visibleSteps, p.stepLabels, p.axisTitle, size, playback, reduced, selectedId, tab, n, mode, light]);
 
   const onCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -296,7 +319,7 @@ export function MusicChart(p: Props) {
       </div>
       {checkpoints.length > 0 && p.enabled && (
         <div className="checkpoint-bar" role="list" aria-label={`Checkpoints in the ${workspace === 'numerical' ? 'Numerical' : 'Visual feed'} timeline`}>
-          <span className="caption-tag" style={{ color: '#fbbf24' }}>Checkpoints</span>
+          <span className="caption-tag">Checkpoints</span>
           {checkpoints.map((c) => (
             <span className="cp-chip" role="listitem" key={c.key}>
               <button className="cp-jump" onClick={() => jumpToCheckpoint(c.key)} title={`Jump to ${c.label}`}>⚑ {c.label}</button>

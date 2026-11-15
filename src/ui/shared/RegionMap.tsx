@@ -3,6 +3,7 @@ import type { Selection } from '../../contracts';
 import { cellValue, formatValue, monthLabel, type Dataset } from '../../data/dataset';
 import { MAP_RANGE, MAP_TICKS, RAMP_CSS, valueColor, valueToT } from '../colormap';
 import { useSweepProgress } from './FrameScore';
+import { useIsLight } from '../shell/theme';
 
 interface Props {
   dataset: Dataset;
@@ -21,6 +22,7 @@ export function RegionMap({ dataset, monthIndex, selection, onSelectCell }: Prop
   const [hover, setHover] = useState<{ li: number; lo: number } | null>(null);
   const g = dataset.grid!;
   const sweepP = useSweepProgress('numerical');
+  const light = useIsLight();
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -79,7 +81,7 @@ export function RegionMap({ dataset, monthIndex, selection, onSelectCell }: Prop
     ctx.drawImage(raster, x0, y0, x1 - x0, y1 - y0);
     ctx.globalAlpha = 1;
     // graticule
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.font = '10px JetBrains Mono, monospace'; ctx.fillStyle = 'rgba(200,220,235,0.6)';
+    ctx.strokeStyle = light ? 'rgba(15,23,42,0.12)' : 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.font = '10px JetBrains Mono, monospace'; ctx.fillStyle = light ? 'rgba(15,23,42,0.6)' : 'rgba(200,220,235,0.6)';
     for (let lon = 118; lon <= 127; lon += 2) { const x = view.x(lon); ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke(); ctx.fillText(`${lon}°E`, x + 2, y1 - 4); }
     for (let lat = 6; lat <= 20; lat += 2) { const y = view.y(lat); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.fillText(`${lat}°N`, x0 + 3, y - 3); }
     // outlines
@@ -93,7 +95,7 @@ export function RegionMap({ dataset, monthIndex, selection, onSelectCell }: Prop
     };
     const feats = dataset.outline?.features ?? [];
     const ph = feats.find((f) => f.id === 'philippines');
-    if (ph) { drawGeom(ph.geometry); ctx.strokeStyle = 'rgba(235,245,255,0.75)'; ctx.lineWidth = 1; ctx.stroke(); }
+    if (ph) { drawGeom(ph.geometry); ctx.strokeStyle = light ? 'rgba(15,23,42,0.8)' : 'rgba(235,245,255,0.75)'; ctx.lineWidth = 1; ctx.stroke(); }
     if (selection?.type === 'area' && selection.regionId) {
       const f = feats.find((x) => x.id === selection.regionId);
       if (f) { drawGeom(f.geometry); ctx.strokeStyle = '#f5b942'; ctx.lineWidth = 2.2; ctx.setLineDash([5, 3]); ctx.stroke(); ctx.setLineDash([]); }
@@ -101,7 +103,7 @@ export function RegionMap({ dataset, monthIndex, selection, onSelectCell }: Prop
     // spatial samples
     for (const s of dataset.samples) {
       const x = view.x(s.cell.lon), y = view.y(s.cell.lat);
-      ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fillStyle = '#a78bfa'; ctx.fill(); ctx.strokeStyle = '#0b1622'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fillStyle = light ? '#6d28d9' : '#a78bfa'; ctx.fill(); ctx.strokeStyle = light ? '#ffffff' : '#0b1622'; ctx.lineWidth = 1; ctx.stroke();
     }
     // selected cell
     if (selection?.type === 'cell' && selection.lat != null && selection.lon != null) {
@@ -117,10 +119,10 @@ export function RegionMap({ dataset, monthIndex, selection, onSelectCell }: Prop
     }
     if (hover) {
       const lat = g.lat0 + hover.li * g.step, lon = g.lon0 + hover.lo * g.step, s = g.step / 2;
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1;
+      ctx.strokeStyle = light ? '#0f172a' : 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1;
       ctx.strokeRect(view.x(lon - s), view.y(lat + s), view.x(lon + s) - view.x(lon - s), view.y(lat - s) - view.y(lat + s));
     }
-  }, [view, raster, selection, hover, dataset, size, g, sweepP]);
+  }, [view, raster, selection, hover, dataset, size, g, sweepP, light]);
 
   const toCell = (e: React.MouseEvent) => {
     const r = canvasRef.current!.getBoundingClientRect();

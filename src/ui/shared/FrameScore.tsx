@@ -8,6 +8,7 @@ import { exploreAt, scanCurrent } from '../../state/actions';
 import { set, useStore } from '../../state/store';
 import { rampColor } from '../colormap';
 import * as I from '../icons';
+import { useIsLight } from '../shell/theme';
 
 /** 0..1 position of the current sweep (one-off "Scan" or per-frame sweep during timelapse), or null. */
 export function useSweepProgress(tab: 'numerical' | 'visual'): number | null {
@@ -49,6 +50,7 @@ export function FrameScore({ grid, events, title, tab, emptyText }: Props) {
   const explore = useStore((s) => s.explore);
   const sound = useStore((s) => s.sound);
   const progress = useSweepProgress(tab);
+  const light = useIsLight();
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -98,12 +100,12 @@ export function FrameScore({ grid, events, title, tab, emptyText }: Props) {
     ctx.font = '10.5px JetBrains Mono, monospace';
     for (const b of beats) {
       const x0 = xOf(b.lon[0]), x1 = xOf(b.lon[1]);
-      if (b.inRegion) { ctx.fillStyle = 'rgba(245,185,66,0.10)'; ctx.fillRect(x0, top, x1 - x0, plotH); }
-      ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
+      if (b.inRegion) { ctx.fillStyle = 'rgba(245,185,66,0.12)'; ctx.fillRect(x0, top, x1 - x0, plotH); }
+      ctx.strokeStyle = light ? 'rgba(15,23,42,0.14)' : 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(x0, top - 4); ctx.lineTo(x0, top + plotH); ctx.stroke();
-      ctx.fillStyle = b.inRegion ? '#f5b942' : '#a9bccb';
+      ctx.fillStyle = b.inRegion ? (light ? '#b45309' : '#f5b942') : (light ? '#475569' : '#a9bccb');
       ctx.fillText(String(b.beat + 1), (x0 + x1) / 2 - 3, top - 8);
-      if (!b.notes.length) { ctx.fillStyle = 'rgba(169,188,203,0.7)'; ctx.font = 'italic 10px Inter, sans-serif'; ctx.fillText('rest', (x0 + x1) / 2 - 9, top + plotH - 4); ctx.font = '10.5px JetBrains Mono, monospace'; }
+      if (!b.notes.length) { ctx.fillStyle = light ? 'rgba(71,85,105,0.75)' : 'rgba(169,188,203,0.7)'; ctx.font = 'italic 10px Inter, sans-serif'; ctx.fillText('rest', (x0 + x1) / 2 - 9, top + plotH - 4); ctx.font = '10.5px JetBrains Mono, monospace'; }
     }
     // latitude bands = notes
     const bandPx = plotH / ((latMax - latLo) / (bands[0] ? bands[0].hi - bands[0].lo : 1));
@@ -111,17 +113,17 @@ export function FrameScore({ grid, events, title, tab, emptyText }: Props) {
     bands.forEach((b, k) => {
       if (b.hi <= latLo || b.lo >= latMax) return;
       const yLo = yOf(Math.max(b.lo, latLo));
-      ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.beginPath(); ctx.moveTo(left, yLo); ctx.lineTo(left + plotW, yLo); ctx.stroke();
+      ctx.strokeStyle = light ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.07)'; ctx.beginPath(); ctx.moveTo(left, yLo); ctx.lineTo(left + plotW, yLo); ctx.stroke();
       if (k % every === 0) {
         const yc = yOf((Math.max(b.lo, latLo) + Math.min(b.hi, latMax)) / 2);
-        ctx.fillStyle = '#d5e2ec'; ctx.font = '10.5px JetBrains Mono, monospace';
+        ctx.fillStyle = light ? '#0f172a' : '#d5e2ec'; ctx.font = '10.5px JetBrains Mono, monospace';
         ctx.fillText(`${midiToName(b.midi).padEnd(3)} ${fmtLat((b.lo + b.hi) / 2)}`, 4, yc + 3.5);
       }
     });
     // rain systems: outlined in their zone colour; lit while the playhead is inside them (held pad)
     for (const s of systems) {
       const lit = progress != null && progress * grid.ncol >= s.colRange[0] && progress * grid.ncol < s.colRange[1] + 1;
-      const rgb = s.zone === 'tropical' ? '94,234,212' : '196,181,253';
+      const rgb = s.zone === 'tropical' ? (light ? '13,148,136' : '94,234,212') : (light ? '109,40,217' : '196,181,253');
       ctx.fillStyle = `rgba(${rgb},${lit ? 0.35 : 0.1})`;
       for (const [c, [r0, r1]] of s.extents) {
         const x = xOf(grid.lonMin + c * grid.step), y0 = yOf(grid.latMin + (r1 + 1) * grid.step), y1 = yOf(grid.latMin + r0 * grid.step);
@@ -139,12 +141,12 @@ export function FrameScore({ grid, events, title, tab, emptyText }: Props) {
       const rad = 3 + (e.velocity ?? 0.4) * 9;
       ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2);
       const passed = progress != null && (e.scan.beat + 0.5) / Math.max(1, beats.length) <= progress;
-      ctx.fillStyle = e.id === selectedId ? '#f5b942' : passed ? '#ede9fe' : '#a78bfa';
+      ctx.fillStyle = e.id === selectedId ? '#f5b942' : passed ? (light ? '#4c1d95' : '#ede9fe') : (light ? '#7c3aed' : '#a78bfa');
       ctx.fill();
-      ctx.strokeStyle = '#0b1622'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = light ? '#ffffff' : '#0b1622'; ctx.lineWidth = 1; ctx.stroke();
     }
     // axes
-    ctx.fillStyle = '#a9bccb'; ctx.font = '11px JetBrains Mono, monospace';
+    ctx.fillStyle = light ? '#475569' : '#a9bccb'; ctx.font = '11px JetBrains Mono, monospace';
     const labelEvery = Math.max(2, Math.ceil(beats.length / 8));
     for (const b of beats) if (b.beat % labelEvery === 0) ctx.fillText(fmtLon(Math.round(b.lon[0])), xOf(b.lon[0]) + 2, top + plotH + 14);
     ctx.font = '11px Inter, sans-serif';
@@ -152,16 +154,16 @@ export function FrameScore({ grid, events, title, tab, emptyText }: Props) {
     ctx.fillText('beat →', left + plotW - 44, top + plotH + 26);
     // explore cursor
     if (explore && explore.col < grid.ncol && explore.row < grid.nrow) {
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+      ctx.strokeStyle = light ? '#0f172a' : '#ffffff'; ctx.lineWidth = 2;
       ctx.strokeRect(left + explore.col * cw - 1, yOf(grid.latMin + (explore.row + 1) * grid.step) - 1, cw + 2, rh + 2);
     }
     // sweep playhead
     if (progress != null) {
       const x = left + progress * plotW;
-      ctx.strokeStyle = '#f5b942'; ctx.lineWidth = 2;
+      ctx.strokeStyle = light ? '#b45309' : '#f5b942'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(x, top - 4); ctx.lineTo(x, top + plotH); ctx.stroke();
     }
-  }, [grid, events, size, layout, progress, selectedId, explore, beats, bands, systems]);
+  }, [grid, events, size, layout, progress, selectedId, explore, beats, bands, systems, light]);
 
   if (!grid) return <div className="empty"><I.Image size={28} /><div className="big">{emptyText}</div></div>;
 

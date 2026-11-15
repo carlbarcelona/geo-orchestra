@@ -201,7 +201,10 @@ export const ProjectFileSchema = z.object({
   sound: z.any(),
   view: z.enum(['table', 'map', 'graph', 'metadata']),
   tab: z.enum(['numerical', 'visual']),
-  visual: z.object({ imported: z.boolean(), linked: z.boolean(), regionId: z.string(), day: z.number(), mode: z.enum(['frame', 'timelapse']), roi: z.boolean(), speed: z.number() }),
+  visual: z.object({ imported: z.boolean(), linked: z.boolean(), regionId: z.string(), day: z.number(), mode: z.enum(['frame', 'timelapse']), roi: z.boolean(), speed: z.number(),
+    // added with scan-v4; older project files omit them
+    crop: z.object({ lonMin: z.number(), lonMax: z.number(), latMin: z.number(), latMax: z.number() }).nullable().optional(),
+    isolate: z.boolean().optional() }),
   a11y: z.any(),
   uiMode: z.enum(['preset', 'advanced']).optional(), // added with rain-v2; older project files omit it
   // added with cue-v1; older project files omit them

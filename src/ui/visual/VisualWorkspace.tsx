@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { controller } from '../../playback/controller';
 import {
   connectClimatology, currentScanEvents, currentScanGrid, disconnectClimatology, exploreAt, exploreMove, frameReady, importVisualFeed, loadFrame,
-  quickStartVisual, scanCurrent, visualScanGrid, seasonalEventsCached, seasonalObservations, seek, setImage, setTab, setVisual, setVisualRegion, svsUrl, togglePlay,
+  normaliseRoi, quickStartVisual, ROI_PRESETS, roiActive, roiLabel, scanCurrent, setRoi, visualScanGrid, seasonalEventsCached, seasonalObservations, seek, setImage, setTab, setVisual, setVisualRegion, svsUrl, togglePlay,
 } from '../../state/actions';
 import { describeFrame, describeSweep } from '../../a11y/braille';
 import { seasonalContexts } from '../../sound/context';
 import { MAPPING } from '../../sound/mapping';
-import { columnProfile, detectSystems, fmtLat, fmtLon, SCAN } from '../../sound/frameScan';
+import { columnProfile, detectSystems, fmtLat, fmtLon, SCAN, type CropBox } from '../../sound/frameScan';
 import { CropLayer, ScanOverlay } from './ScanOverlay';
 import { ListeningGuide, ListeningPresetCards, NarrationToggle } from '../preset/PresetPanels';
 import { BrailleChart } from '../shared/BrailleChart';
@@ -214,7 +214,10 @@ function VisualFeed({ preset }: { preset: boolean }) {
   // the grid the sweep reads: the whole frame (or the user's crop) in the full view, the West Pacific grid in ROI view
   const sg = useMemo(() => (scanDoc && imageOn ? visualScanGrid(visual.day) : null), [scanDoc, globalBytes, imageOn, visual.day, visual.roi, visual.crop]); // eslint-disable-line react-hooks/exhaustive-deps
   const systems = useMemo(() => (sg ? detectSystems(sg) : []), [sg]);
-  const canCrop = !visual.roi && !!globalBytes && imageOn;
+  const canCrop = !!scanDoc && imageOn;
+  const roiOn = visual.roi || !!visual.crop;
+  const [showRoi, setShowRoi] = useState(false);
+  useEffect(() => { if (visual.cropping) setShowRoi(true); }, [visual.cropping]);
   useEffect(() => {
     if (!visual.cropping) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setVisual({ cropping: false }); };
@@ -237,10 +240,13 @@ function VisualFeed({ preset }: { preset: boolean }) {
 
   const pending = displayed && (displayed.day !== visual.day || displayed.roi !== visual.roi);
   const shownFrame = displayed ? frames?.[displayed.day] : null;
-  const box = media.manifest ? (visual.roi ? media.manifest.roi : media.manifest.bounds) : { lonMin: -180, lonMax: 180, latMin: -90, latMax: 90 };
+  const full = media.manifest?.bounds ?? { lonMin: -180, lonMax: 180, latMin: -90, latMax: 90 };
+  // Isolate: the stage shows only the ROI (the frame image is scaled and shifted inside it); paused while drawing a new one
+  const zoom = !visual.roi && visual.crop && visual.isolate && !visual.cropping ? visual.crop : null;
+  const box = media.manifest ? (visual.roi ? media.manifest.roi : zoom ?? full) : full;
   const pct = (lon: number, lat: number) => ({ x: ((lon - box.lonMin) / (box.lonMax - box.lonMin)) * 100, y: ((box.latMax - lat) / (box.latMax - box.latMin)) * 100 });
   const a = pct(PH_BOX.lonMin, PH_BOX.latMax), b = pct(PH_BOX.lonMax, PH_BOX.latMin);
-  const aspect = media.manifest ? (visual.roi ? media.manifest.roi.pixelSize[0] / media.manifest.roi.pixelSize[1] : 2) : 2;
+  const aspect = media.manifest ? (visual.roi ? media.manifest.roi.pixelSize[0] / media.manifest.roi.pixelSize[1] : zoom ? (zoom.lonMax - zoom.lonMin) / (zoom.latMax - zoom.latMin) : 2) : 2;
   const stage = useStage(aspect, visual.fit === 'fill');
   const fullscreen = () => { const el = panelRef.current; if (!el) return; if (document.fullscreenElement) void document.exitFullscreen(); else void el.requestFullscreen?.(); };
 
@@ -253,14 +259,13 @@ function VisualFeed({ preset }: { preset: boolean }) {
           <button aria-pressed={visual.mode === 'frame'} onClick={() => { setVisual({ mode: 'frame' }); if (controller.state !== 'stopped') controller.pause('frame mode'); }}>Frame</button>
           <button aria-pressed={visual.mode === 'timelapse'} onClick={() => setVisual({ mode: 'timelapse' })}>Timelapse</button>
         </div>
-        <button className={`btn small ${visual.roi ? 'active' : ''}`} aria-pressed={visual.roi} onClick={() => setVisual({ roi: !visual.roi })} disabled={!media.manifest}><I.Roi /> ROI</button>
+        <button className={`btn small ${roiOn || showRoi ? 'active' : ''}`} aria-expanded={showRoi} aria-controls="roi-bar" onClick={() => setShowRoi(!showRoi)} disabled={media.state !== 'ready'}
+          title="Region of interest: crop part of the map, isolate it, and hear only that region"><I.Roi /> ROI{roiOn ? ' · on' : ''}</button>
         {!preset && <select value={visual.fit} onChange={(e) => setVisual({ fit: e.target.value as 'fit' | 'fill' })} aria-label="Image fit"><option value="fit">Fit</option><option value="fill">Fill</option></select>}
-        <button className={`btn small ${visual.cropping ? 'active' : ''}`} aria-pressed={visual.cropping} disabled={!canCrop || media.state !== 'ready'}
-          onClick={() => setVisual({ cropping: !visual.cropping })} title="Drag a box on the map so the sweep reads only that part"><I.Roi /> Crop sweep</button>
-        {visual.crop && !visual.roi && <button className="btn small" onClick={() => setVisual({ crop: null, cropping: false })} title="Sweep the entire frame again"><I.X size={13} /> Full frame</button>}
-        <button className="btn small" onClick={() => void scanCurrent()} disabled={!scanDoc || !imageOn || media.state !== 'ready'} aria-keyshortcuts="S"><I.Wave size={14} /> {visual.roi ? 'Sweep ROI' : visual.crop ? 'Sweep crop' : 'Sweep frame'}</button>
+        <button className="btn small" onClick={() => void scanCurrent()} disabled={!scanDoc || !imageOn || media.state !== 'ready'} aria-keyshortcuts="S"><I.Wave size={14} /> {roiOn ? 'Sweep ROI' : 'Sweep frame'}</button>
         <button className="btn icon small" onClick={fullscreen} aria-label="Toggle fullscreen"><I.Expand /></button>
       </div>
+      {showRoi && media.state === 'ready' && <RoiBar canDraw={canCrop} />}
       <div className={`frame-wrap ${visual.roi ? 'roi' : ''}`} ref={stage.ref}>
         {media.state !== 'ready' && (
           <div className="feed-empty">
@@ -282,7 +287,7 @@ function VisualFeed({ preset }: { preset: boolean }) {
         )}
         {media.state === 'ready' && displayed && (
           <>
-            <div style={{ position: 'relative', width: stage.w, height: stage.h, flex: 'none', outline: 'none' }}
+            <div style={{ position: 'relative', width: stage.w, height: stage.h, flex: 'none', outline: 'none', overflow: 'hidden' }}
               tabIndex={scanDoc && imageOn ? 0 : -1} role="application"
               aria-label={`Explore the frame by touch or keyboard: arrow keys move a ${sg?.step ?? 1}-degree cursor over ${sg?.area ?? 'the frame'} and you hear and read the rain there. Press S to sweep it west to east.`}
               onKeyDown={(e) => {
@@ -299,21 +304,28 @@ function VisualFeed({ preset }: { preset: boolean }) {
                 const col = Math.floor((lon - g.lonMin) / g.step), row = Math.floor((lat - g.latMin) / g.step);
                 if (col >= 0 && row >= 0 && col < g.ncol && row < g.nrow && (explore?.col !== col || explore?.row !== row)) exploreAt(row, col);
               }}>
-            <img src={displayed.src} style={{ width: '100%', height: '100%', opacity: pending ? 0.25 : 1 }} alt={`NASA SVS 5478 IMERG precipitation climatology frame for ${shownFrame?.label} (seasonal average 2001–2022)${visual.roi ? ', West Pacific region of interest' : ''}`}
+            <img src={displayed.src}
+              style={zoom && !displayed.roi ? {
+                position: 'absolute', maxWidth: 'none', maxHeight: 'none', opacity: pending ? 0.25 : 1,
+                width: (stage.w * (full.lonMax - full.lonMin)) / (zoom.lonMax - zoom.lonMin), height: (stage.h * (full.latMax - full.latMin)) / (zoom.latMax - zoom.latMin),
+                left: (-stage.w * (zoom.lonMin - full.lonMin)) / (zoom.lonMax - zoom.lonMin), top: (-stage.h * (full.latMax - zoom.latMax)) / (zoom.latMax - zoom.latMin),
+              } : { width: '100%', height: '100%', opacity: pending ? 0.25 : 1 }}
+              alt={`NASA SVS 5478 IMERG precipitation climatology frame for ${shownFrame?.label} (seasonal average 2001–2022)${visual.roi ? ', West Pacific region of interest' : zoom ? `, zoomed to your region of interest ${roiLabel()}` : ''}`}
               />
             {!visual.roi && (
               <>
                 <div className="roi-box" style={{ left: `${a.x}%`, top: `${a.y}%`, width: `${b.x - a.x}%`, height: `${b.y - a.y}%` }} />
-                <span className="roi-tag" style={{ left: `calc(${b.x}% + 8px)`, top: `calc(${a.y}% - 4px)` }}>{REGION_NAMES[visual.regionId]} ROI</span>
+                <span className="roi-tag" style={{ left: `calc(${b.x}% + 8px)`, top: `calc(${a.y}% - 4px)` }} title="The area the linked measurements (piano) describe">{REGION_NAMES[visual.regionId]} · measured area</span>
               </>
             )}
             {visual.roi && <div className="roi-box" style={{ left: `${a.x}%`, top: `${a.y}%`, width: `${b.x - a.x}%`, height: `${b.y - a.y}%` }} />}
             {sg && imageOn && (() => {
               const g = sg;
-              const ca0 = visual.crop && !visual.roi ? pct(visual.crop.lonMin, visual.crop.latMax) : null, ca1 = visual.crop && !visual.roi ? pct(visual.crop.lonMax, visual.crop.latMin) : null;
+              const dim = visual.crop && !visual.roi && !zoom;
+              const ca0 = dim ? pct(visual.crop!.lonMin, visual.crop!.latMax) : null, ca1 = dim ? pct(visual.crop!.lonMax, visual.crop!.latMin) : null;
               return (
                 <>
-                  {ca0 && ca1 && <div className="crop-box" aria-hidden="true" style={{ left: `${ca0.x}%`, top: `${ca0.y}%`, width: `${ca1.x - ca0.x}%`, height: `${ca1.y - ca0.y}%` }}><span>Sweep crop · {fmtLat(visual.crop!.latMin)}–{fmtLat(visual.crop!.latMax)}, {fmtLon(visual.crop!.lonMin)}–{fmtLon(visual.crop!.lonMax)}</span></div>}
+                  {ca0 && ca1 && <div className="crop-box" aria-hidden="true" style={{ left: `${ca0.x}%`, top: `${ca0.y}%`, width: `${ca1.x - ca0.x}%`, height: `${ca1.y - ca0.y}%` }}><span>Your ROI · {fmtLat(visual.crop!.latMin)}–{fmtLat(visual.crop!.latMax)}, {fmtLon(visual.crop!.lonMin)}–{fmtLon(visual.crop!.lonMax)}</span></div>}
                   <ScanOverlay grid={g} systems={systems} box={box} progress={sweepP} reduced={reduced} />
                   {explore && (() => {
                     const ca = pct(g.lonMin + explore.col * g.step, g.latMin + (explore.row + 1) * g.step), cb = pct(g.lonMin + (explore.col + 1) * g.step, g.latMin + explore.row * g.step);
@@ -322,9 +334,10 @@ function VisualFeed({ preset }: { preset: boolean }) {
                 </>
               );
             })()}
-            {visual.cropping && canCrop && <CropLayer box={box} onDone={(c) => setVisual({ crop: c ?? visual.crop, cropping: false })} />}
+            {visual.cropping && canCrop && <CropLayer box={box} onDone={(c) => (c ? setRoi(c) : setVisual({ cropping: false }))} />}
             </div>
             <div className="frame-label" style={{ top: 10, left: 10, fontWeight: 600 }}>IMERG precipitation climatology</div>
+            {zoom && <div className="frame-label roi-zoom-label" style={{ top: 44, left: 10 }}>Isolated ROI · {roiLabel()} · zoomed NASA frame</div>}
             <div className="frame-label" style={{ top: 10, right: 10, fontSize: 12 }}>Authentic NASA SVS frame #{shownFrame?.sourceFrame}</div>
             <div className="frame-label" style={{ bottom: 10, right: 10 }} aria-live="off">
               {pending ? `Loading ${frames?.[visual.day]?.label}…` : `Day ${displayed.day + 1} · ${shownFrame?.label} · seasonal average`}
@@ -373,6 +386,64 @@ function VisualFeed({ preset }: { preset: boolean }) {
         )}
       </div>
     </section>
+  );
+}
+
+/** Region of interest: quick picks, draw on the map, or type the edges (the keyboard way), and isolate. */
+function RoiBar({ canDraw }: { canDraw: boolean }) {
+  const visual = useStore((s) => s.visual);
+  const manifest = useStore((s) => s.media.manifest);
+  const roiVoice = useStore((s) => s.image.roiVoice);
+  const imageOn = useStore((s) => s.image.enabled);
+  const cur: CropBox | null = visual.roi ? manifest?.roi ?? null : visual.crop;
+  const asText = (b: CropBox | null) => ({ lonMin: b ? String(b.lonMin) : '', lonMax: b ? String(b.lonMax) : '', latMin: b ? String(b.latMin) : '', latMax: b ? String(b.latMax) : '' });
+  const [draft, setDraft] = useState(asText(cur));
+  const [err, setErr] = useState('');
+  useEffect(() => { setDraft(asText(cur)); setErr(''); }, [cur?.lonMin, cur?.lonMax, cur?.latMin, cur?.latMax]); // eslint-disable-line react-hooks/exhaustive-deps
+  const active = (p: (typeof ROI_PRESETS)[number]) => p.box === null ? !roiActive() : p.box === 'west-pacific' ? visual.roi
+    : !visual.roi && !!visual.crop && (['lonMin', 'lonMax', 'latMin', 'latMax'] as const).every((k) => visual.crop![k] === (p.box as CropBox)[k]);
+  const apply = () => {
+    const b = normaliseRoi({ lonMin: parseFloat(draft.lonMin), lonMax: parseFloat(draft.lonMax), latMin: parseFloat(draft.latMin), latMax: parseFloat(draft.latMax) });
+    if (typeof b === 'string') { setErr(b); return; }
+    setErr('');
+    setRoi(b);
+  };
+  const field = (k: keyof CropBox, label: string, hint: string, min: number, max: number) => (
+    <label className="roi-field"><span>{label}</span>
+      <input type="number" inputMode="decimal" step={0.5} min={min} max={max} value={draft[k]} aria-label={`${label} edge, ${hint}`}
+        onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} className="num-input" />
+    </label>
+  );
+  return (
+    <div id="roi-bar" className="roi-bar" role="group" aria-label="Region of interest">
+      <div className="row roi-row">
+        <b className="roi-bar-title">Region of interest</b>
+        <div className="seg roi-picks" role="group" aria-label="Quick regions">
+          {ROI_PRESETS.map((p) => <button key={p.id} aria-pressed={active(p)} onClick={() => setRoi(p.box)}>{p.label}</button>)}
+        </div>
+        <button className={`btn small ${visual.cropping ? 'active' : 'primary'}`} aria-pressed={visual.cropping} disabled={!canDraw}
+          onClick={() => setVisual({ cropping: !visual.cropping })} title={canDraw ? 'Drag a box on the map' : 'Turn image features on to crop the map'}>
+          <I.Roi size={14} /> {visual.cropping ? 'Drawing… Esc to cancel' : 'Draw on map'}
+        </button>
+      </div>
+      <form className="row roi-row" onSubmit={(e) => { e.preventDefault(); apply(); }}>
+        {field('lonMin', 'West', 'degrees east, negative for west', -180, 180)}
+        {field('lonMax', 'East', 'degrees east, negative for west', -180, 180)}
+        {field('latMin', 'South', 'degrees north, negative for south', -90, 90)}
+        {field('latMax', 'North', 'degrees north, negative for south', -90, 90)}
+        <button type="submit" className="btn small">Apply</button>
+        {visual.crop && !visual.roi && (
+          <label className="row roi-isolate"><input type="checkbox" checked={visual.isolate} onChange={(e) => setVisual({ isolate: e.target.checked })} /> Isolate (zoom the map to it)</label>
+        )}
+        {roiActive() && <button type="button" className="btn small ghost" onClick={() => setRoi(null)}><I.X size={13} /> Clear</button>}
+        {err && <span className="roi-err" role="alert">{err}</span>}
+      </form>
+      <div className="muted roi-status">
+        {roiActive()
+          ? <>Sounds from <b>{roiLabel()}</b>: the sweep (S), the Frame score, the explore cursor{imageOn && roiVoice ? ' and the ROI voice (a plucked note per day: higher = more rain)' : ''}. Image-derived from NASA's colours. The piano still plays the linked {REGION_NAMES[visual.regionId]} measurements.</>
+          : <>No region: the sweep reads the whole frame. Pick a region, draw a box on the map, or type its edges in degrees.</>}
+      </div>
+    </div>
   );
 }
 
@@ -487,6 +558,7 @@ function ImageFeaturesToggle() {
         <>
           <label className="row" style={{ fontSize: 12.5 }}><input type="checkbox" checked={image.featureVoice} onChange={(e) => setImage({ featureVoice: e.target.checked })} /> Rain-band voice (follows the band north/south)</label>
           <label className="row" style={{ fontSize: 12.5 }}><input type="checkbox" checked={image.sweepEveryFrame} onChange={(e) => setImage({ sweepEveryFrame: e.target.checked })} /> Sweep every frame during timelapse (≤1 day/s)</label>
+          <label className="row" style={{ fontSize: 12.5 }}><input type="checkbox" checked={image.roiVoice} onChange={(e) => setImage({ roiVoice: e.target.checked })} /> ROI voice: a plucked note per day for the rain inside your region of interest</label>
           <span className="muted" style={{ fontSize: 11 }}>Decoded values agree with the IMERG reconstruction: r = {fs.doc.decodeValidation.vsReconstructedClimatology.pearsonR}, bias {fs.doc.decodeValidation.vsReconstructedClimatology.meanBiasMmDay} mm/day.</span>
         </>
       )}

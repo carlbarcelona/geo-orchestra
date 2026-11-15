@@ -63,7 +63,9 @@ export interface AppState {
   chartTab: 'roll' | 'score' | 'details';
   /** image features (decoded SVS frames) */
   frameScan: { state: 'none' | 'loading' | 'ready' | 'error'; doc: FrameScanDoc | null; bytes: Uint8Array | null; globalBytes: Uint8Array | null; message: string };
-  image: { enabled: boolean; sweepEveryFrame: boolean; featureVoice: boolean };
+  image: { enabled: boolean; sweepEveryFrame: boolean; featureVoice: boolean;
+    /** scan-v4: play the rain inside the ROI each day during the timelapse */
+    roiVoice: boolean };
   sweep: { active: boolean; startedAt: number; seconds: number; tab: Tab } | null;
   explore: { row: number; col: number } | null;
   graphTab: 'describe' | 'rain' | 'band' | 'dist';
@@ -71,8 +73,14 @@ export interface AppState {
   media: { state: MediaState; message: string; manifest: VisualMediaManifest | null; alignment: AlignmentEvidence | null };
   link: { state: LinkState; message: string; climatology: ClimatologyLinkage | null };
   visual: { day: number; mode: 'frame' | 'timelapse'; roi: boolean; fit: 'fit' | 'fill'; regionId: string; speed: number; fullscreen: boolean;
-    /** user crop of the whole frame for sweeps (degrees); null = sweep the entire frame */
-    crop: { lonMin: number; lonMax: number; latMin: number; latMax: number } | null; cropping: boolean };
+    /**
+     * The region of interest (degrees) drawn or typed by the user; null = none (the whole frame). The sweep, the
+     * Frame score, the explore cursor and the ROI voice all read only this box. `roi: true` is the West Pacific
+     * preset, which shows NASA's sharper pre-cropped frames.
+     */
+    crop: { lonMin: number; lonMax: number; latMin: number; latMax: number } | null; cropping: boolean;
+    /** zoom the frame to the ROI (true) or show the whole frame with the outside dimmed (false) */
+    isolate: boolean };
   a11y: A11ySettings;
   dialogs: { a11y: boolean; legend: boolean; sources: boolean; shortcuts: boolean };
   announcement: { text: string; id: number };
@@ -122,13 +130,13 @@ export const useStore = create<AppState>(() => ({
   selectedEventId: null,
   chartTab: 'roll',
   frameScan: { state: 'none', doc: null, bytes: null, globalBytes: null, message: '' },
-  image: { enabled: true, sweepEveryFrame: false, featureVoice: true },
+  image: { enabled: true, sweepEveryFrame: false, featureVoice: true, roiVoice: true },
   sweep: null,
   explore: null,
   graphTab: 'describe',
   media: { state: 'none', message: '', manifest: null, alignment: null },
   link: { state: 'none', message: '', climatology: null },
-  visual: { day: 0, mode: 'timelapse', roi: false, fit: 'fit', regionId: 'philippines', speed: 10, fullscreen: false, crop: null, cropping: false },
+  visual: { day: 0, mode: 'timelapse', roi: false, fit: 'fit', regionId: 'philippines', speed: 10, fullscreen: false, crop: null, cropping: false, isolate: true },
   a11y: { reducedMotion: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches, highContrast: false, largeText: false, announceSteps: false, brailleCharts: true, describeEvery: 15, haptics: true, speak: false, briefAdvanced: true },
   dialogs: { a11y: false, legend: false, sources: false, shortcuts: false },
   announcement: { text: '', id: 0 },

@@ -128,7 +128,7 @@ export function briefingScript(o: BriefingInput): BriefSegment[] {
     if (o.roi) {
       out.push({
         id: 'roi', title: 'Your region · ROI voice',
-        text: 'A soft bell plays the rain inside the region you cropped. A higher bell means more rain there, and silence means it is dry.',
+        text: 'A short plucked note plays the rain inside the region you cropped. A higher note means more rain there, and silence means it is dry there.',
         example: o.frameData ? { kind: 'roi' } : undefined,
       });
     }

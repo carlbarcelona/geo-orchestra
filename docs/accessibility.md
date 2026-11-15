@@ -32,6 +32,7 @@
 
 ## Hearing and reading what a frame shows
 
+- **Region of interest without a pointer:** the ROI bar's quick picks and its four labelled number fields (West, East, South, North, in degrees) set the region from the keyboard; Apply or Enter confirms it. Invalid input is reported in an alert next to the fields. Every change is announced, and the caption names the ROI voice's value.
 - **Sweep (S key, or the "Sweep frame" button):** the frame is played west → east in the Hubble style (see mapping-guide.md). A gold line moves across the image and the Frame score at the same time.
 - **Explore (audio cursor):**
   - Focus the frame (Tab), then use the arrow keys to move a 1° cursor; Shift moves 5°.

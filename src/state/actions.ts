@@ -4,7 +4,8 @@ import { speak, spokenForm, stopSpeaking } from '../a11y/speech';
 import { briefingScript, briefingSignature, needsBriefing, type BriefExample } from '../a11y/briefing';
 import { BriefingPlayer } from '../a11y/briefingPlayer';
 import { explainStep, monthlyContexts, seasonalContexts } from '../sound/context';
-import { cellEvent, cropGrid, featureEvents, frameGrid, frameGridGlobal, imergGrid, SCAN, scanEvents, type ScanGrid } from '../sound/frameScan';
+import { cellEvent, cropGrid, featureEvents, fmtLat, fmtLon, frameGrid, frameGridGlobal, imergGrid, roiEvents, roiMean, roiNote, SCAN, scanEvents, type CropBox, type ScanGrid } from '../sound/frameScan';
+import { scaleNotes } from '../sound/mapping';
 import { DEFAULT_PRESET, getPreset, type ListeningPresetId } from '../sound/presets';
 import { PRESET_TIME_CUES, timeCueEvents, type Checkpoint, type CueSound, type TimeCueSettings } from '../sound/timeCues';
 import { ProjectFileSchema, type ProjectFile } from '../contracts';
@@ -245,7 +246,10 @@ export function currentCaption(): string {
   if (s.link.state !== 'reconstructed') return '';
   const f = s.media.manifest?.frames[s.visual.day];
   const step = seasonalEvents()[s.visual.day];
-  return step && f ? explainStep(step, s.sound.mode, `${f.label} (seasonal average)`) : '';
+  if (!step || !f) return '';
+  const roi = step.find((e) => e.selectionId === 'roi');
+  const roiPart = roi?.original?.value != null ? ` · your region: ${roi.original.value.toFixed(1)} mm/day (image-derived) → plucked ${roi.note}` : '';
+  return explainStep(step, s.sound.mode, `${f.label} (seasonal average)`) + roiPart;
 }
 
 export function announceCurrent() {
@@ -273,7 +277,7 @@ export function currentBriefing(tab: Tab = get().tab) {
   const script = briefingScript({
     workspace: tab, mode: s.sound.mode, reference: s.sound.reference, harmony: s.sound.harmony, cues: s.sound.cues, muted: s.sound.muted,
     imageEnabled: s.image.enabled, featureVoice: s.image.featureVoice, frameData: !!s.frameScan.doc,
-    roi: tab === 'visual' && !!s.visual.crop,
+    roi: tab === 'visual' && roiActive() && s.image.roiVoice,
   });
   return { script, signature: briefingSignature(tab, s.sound.mode, script) };
 }
@@ -339,13 +343,17 @@ async function playBriefingExample(ex: BriefExample): Promise<void> {
     await engine.audition([...pick(south, 0), ...pick(north, 0.5)], 'musical');
     await pauseMs(1900);
   } else if (ex.kind === 'roi') {
-    const ev = briefingRoiExample();
-    if (ev.length) { await engine.audition(ev, 'musical'); await pauseMs(1900); }
+    // the ROI's driest and wettest day of the average year, as the ROI voice plays them
+    const n = s.media.manifest?.frames.length ?? 0;
+    const series = Array.from({ length: n }, (_, i) => { const g = visualScanGrid(i); return g ? roiMean(g).value : null; });
+    const known = series.filter((v): v is number => v != null);
+    if (!known.length) return;
+    const notes = scaleNotes(s.sound.scale, s.sound.pitchLow, s.sound.pitchHigh);
+    const mk = (v: number, offset: number): SoundEvent => ({ id: `briefing|roi|${offset}`, datasetId: 'briefing', selectionId: 'roi', sourceObservationIds: [], stepIndex: 0, kind: 'scan', offset, duration: 0.4, midi: roiNote(v, notes), velocity: 0.6, pan: 0, mappingVersion: SCAN.version, explanation: '', original: { value: +v.toFixed(2), unit: 'mm/day', t: 'briefing', label: 'ROI example', derivation: 'image-derived' } });
+    await engine.audition([mk(Math.min(...known), 0), mk(Math.max(...known), 0.5)], 'musical');
+    await pauseMs(1900);
   }
 }
-/** The ROI voice example (scan-v4): a dry-to-wet pair of ROI notes; empty until an ROI exists. */
-let briefingRoiExample: () => SoundEvent[] = () => [];
-export function setBriefingRoiExample(f: () => SoundEvent[]) { briefingRoiExample = f; }
 
 // ------------------------------------------------------------------ sound settings
 export const ELEMENT_LABELS: Record<keyof LayerLevels, string> = { melody: 'Melody', texture: 'Rain texture', markers: 'Markers', image: 'Frame sweep & band', context: 'Normal & cues', time: 'Time cues' };
@@ -610,7 +618,7 @@ function seasonalEvents(): SoundEvent[][] {
   const cueSettings = effectiveTimeCues('visual');
   const key = [link.climatology ? link.state : 'none', visual.regionId, media.manifest?.frames.length ?? 0, sound.scale, sound.pitchLow, sound.pitchHigh,
     sound.reference, sound.harmony, sound.cues, sound.variation, image.enabled, image.featureVoice, image.sweepEveryFrame, frameScan.state,
-    visual.roi, JSON.stringify(visual.crop), JSON.stringify(cueSettings), JSON.stringify(checkpoints.visual)].join('|');
+    image.roiVoice, visual.roi, JSON.stringify(visual.crop), JSON.stringify(cueSettings), JSON.stringify(checkpoints.visual)].join('|');
   if (seasonalCache?.key === key && link.climatology === seasonalCacheClim) return seasonalCache.events;
   const events = buildSeasonalEvents(cueSettings);
   seasonalCache = { key, events };
@@ -642,6 +650,10 @@ function buildSeasonalEvents(cueSettings: TimeCueSettings): SoundEvent[][] {
         label: `${labels[i]} frame sweep`, datasetId: 'svs5478-frames', selectionId: 'frame', offsetStart: 0.05, span: 0.9,
       }));
     });
+    if (image.roiVoice && roiActive()) {
+      const roi = roiEvents((i) => visualScanGrid(i), steps.length, { scale: sound.scale, pitchLow: sound.pitchLow, pitchHigh: sound.pitchHigh, labels, area: roiLabel() });
+      steps.forEach((step, i) => step.push(...(roi[i] ?? [])));
+    }
   }
   return steps;
 }
@@ -686,13 +698,70 @@ export function setImage(patch: Partial<ReturnType<typeof get>['image']>) {
  */
 export function visualScanGrid(day: number): ScanGrid | null {
   const s = get();
-  if (!s.frameScan.doc || !s.frameScan.bytes) return null;
-  if (!s.visual.roi && s.frameScan.globalBytes) {
-    const g = frameGridGlobal(s.frameScan.doc, s.frameScan.globalBytes, day);
-    if (g && s.visual.crop) return cropGrid(g, s.visual.crop) ?? g;
+  const doc = s.frameScan.doc;
+  if (!doc || !s.frameScan.bytes) return null;
+  const wp = frameGrid(doc, s.frameScan.bytes, day);
+  if (s.visual.roi) return { ...wp, area: 'West Pacific ROI' };
+  const crop = s.visual.crop;
+  if (crop) {
+    // an ROI inside the West Pacific uses its 1° grid; anywhere else, the whole-frame 2.5° grid
+    const g = doc.grid;
+    const inWp = crop.lonMin >= g.lonMin && crop.lonMax <= g.lonMin + g.ncol * g.step && crop.latMin >= g.latMin && crop.latMax <= g.latMin + g.nrow * g.step;
+    const fine = inWp ? cropGrid(wp, crop) : null;
+    if (fine) return { ...fine, area: `your ROI ${roiLabel()}` };
+    const whole = s.frameScan.globalBytes ? frameGridGlobal(doc, s.frameScan.globalBytes, day) : null;
+    const coarse = whole ? cropGrid(whole, crop) : null;
+    if (coarse) return { ...coarse, area: `your ROI ${roiLabel()}` };
+  }
+  if (s.frameScan.globalBytes) {
+    const g = frameGridGlobal(doc, s.frameScan.globalBytes, day);
     if (g) return g;
   }
-  return frameGrid(s.frameScan.doc, s.frameScan.bytes, day);
+  return wp;
+}
+
+/** True when the user has a region of interest: a drawn/typed box, or the West Pacific preset. */
+export function roiActive(): boolean {
+  const v = get().visual;
+  return v.roi || !!v.crop;
+}
+/** The ROI in words, e.g. "116°E–127.5°E, 4.5°N–21.5°N". */
+export function roiLabel(): string {
+  const s = get();
+  const b = s.visual.roi ? s.media.manifest?.roi : s.visual.crop;
+  return b ? `${fmtLon(b.lonMin)}–${fmtLon(b.lonMax)}, ${fmtLat(b.latMin)}–${fmtLat(b.latMax)}` : 'whole frame';
+}
+
+/** Quick picks for the ROI tool. */
+export const ROI_PRESETS: { id: string; label: string; box: CropBox | 'west-pacific' | null }[] = [
+  { id: 'whole', label: 'Whole frame', box: null },
+  { id: 'west-pacific', label: 'West Pacific (detailed)', box: 'west-pacific' },
+  { id: 'philippines', label: 'Philippines', box: { lonMin: 116, lonMax: 127.5, latMin: 4.5, latMax: 21.5 } },
+  { id: 'maritime', label: 'Maritime Continent', box: { lonMin: 95, lonMax: 150, latMin: -10, latMax: 10 } },
+];
+
+/** Validate and snap a typed or drawn ROI. Returns an error message instead when it cannot be used. */
+export function normaliseRoi(b: CropBox): CropBox | string {
+  const vals = [b.lonMin, b.lonMax, b.latMin, b.latMax];
+  if (vals.some((v) => !Number.isFinite(v))) return 'Enter four numbers.';
+  const lonMin = Math.max(-180, Math.min(b.lonMin, b.lonMax)), lonMax = Math.min(180, Math.max(b.lonMin, b.lonMax));
+  const latMin = Math.max(-90, Math.min(b.latMin, b.latMax)), latMax = Math.min(90, Math.max(b.latMin, b.latMax));
+  if (lonMax - lonMin < 3 || latMax - latMin < 3) return 'The region must be at least 3° wide and 3° tall.';
+  const r = (v: number) => +v.toFixed(1);
+  return { lonMin: r(lonMin), lonMax: r(lonMax), latMin: r(latMin), latMax: r(latMax) };
+}
+
+/** Set (or clear) the region of interest. Sounds, score and explore follow it; playback continues. */
+export function setRoi(box: CropBox | 'west-pacific' | null, opts: { isolate?: boolean } = {}) {
+  const v = get().visual;
+  if (box === 'west-pacific') setVisual({ roi: true, crop: null, cropping: false, ...(opts.isolate != null ? { isolate: opts.isolate } : {}) });
+  else {
+    const b = box ? normaliseRoi(box) : null;
+    if (typeof b === 'string') { announce(b); return; }
+    setVisual({ roi: false, crop: b, cropping: false, isolate: opts.isolate ?? (b ? true : v.isolate) });
+  }
+  if (controller.adapterId === 'seasonal') controller.updateEvents(seasonalEvents());
+  set({ eventsRev: get().eventsRev + 1 });
 }
 
 /** The grid a sweep/explore acts on: decoded SVS frame (visual tab) or measured IMERG month (numerical tab). */
@@ -780,10 +849,13 @@ export function setVisualRegion(regionId: string) {
   announce(`Visual feed region: ${regionId}`);
 }
 export function setVisual(patch: Partial<ReturnType<typeof get>['visual']>) {
-  set({ visual: { ...get().visual, ...patch } });
+  const before = get().visual;
+  if (patch.roi === before.roi) delete patch.roi; // only a real change reloads frames and resets the cursor
+  set({ visual: { ...before, ...patch } });
   if (patch.roi != null || 'crop' in patch) set({ explore: null });
-  if (patch.crop) announce(`Sweep crop set: the sweep now reads only ${patch.crop.latMin}° to ${patch.crop.latMax}° latitude, ${patch.crop.lonMin}° to ${patch.crop.lonMax}° longitude.`);
-  else if ('crop' in patch && patch.crop === null) announce('Sweep crop cleared: the sweep reads the entire frame.');
+  if (patch.crop) announce(`Region of interest set: ${roiLabel()}. The sweep, the score, the explore cursor and the ROI voice now use only this region.`);
+  else if (patch.roi) announce('Region of interest: West Pacific, with NASA\'s detailed frames.');
+  else if ('crop' in patch && patch.crop === null && !get().visual.roi) announce('Region of interest cleared: sounds come from the whole frame.');
   if (patch.roi != null) { void loadFrame(get().visual.day).catch(() => undefined); preloadFrames(get().visual.day); }
 }
 
@@ -797,7 +869,7 @@ export function saveProject() {
     range: s.dataset ? [s.dataset.months[s.range[0]], s.dataset.months[s.range[1]]] : null,
     cursor: s.dataset ? s.dataset.months[s.cursor] : null,
     speed: s.speed, loop: s.loop, sound: s.sound, view: s.view, tab: s.tab,
-    visual: { imported: s.media.state === 'ready', linked: s.link.state === 'reconstructed', regionId: s.visual.regionId, day: s.visual.day, mode: s.visual.mode, roi: s.visual.roi, speed: s.visual.speed },
+    visual: { imported: s.media.state === 'ready', linked: s.link.state === 'reconstructed', regionId: s.visual.regionId, day: s.visual.day, mode: s.visual.mode, roi: s.visual.roi, speed: s.visual.speed, crop: s.visual.crop, isolate: s.visual.isolate },
     a11y: s.a11y,
     uiMode: s.uiMode,
     checkpoints: s.checkpoints,
@@ -840,7 +912,7 @@ export async function openProject(file: File): Promise<string[]> {
     if (ci >= 0) controller.seek(ci);
     controller.setSpeed(doc.speed);
   }
-  set({ visual: { ...get().visual, regionId: doc.visual.regionId, day: doc.visual.day, mode: doc.visual.mode, roi: doc.visual.roi, speed: doc.visual.speed } });
+  set({ visual: { ...get().visual, regionId: doc.visual.regionId, day: doc.visual.day, mode: doc.visual.mode, roi: doc.visual.roi, speed: doc.visual.speed, crop: doc.visual.crop ?? null, isolate: doc.visual.isolate ?? true } });
   if (doc.visual.imported) await importVisualFeed();
   if (doc.visual.linked) await connectClimatology();
   if (doc.tab !== get().tab) setTab(doc.tab);

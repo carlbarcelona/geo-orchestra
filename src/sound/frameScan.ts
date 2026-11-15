@@ -29,7 +29,7 @@ export interface ScanGrid {
 }
 
 export const SCAN = {
-  version: 'scan-v3',
+  version: 'scan-v4',
   beats: 11,
   notesPerBeat: 2,
   latRange: [-10, 30] as [number, number],
@@ -389,5 +389,62 @@ export function systemEvents(systems: RainSystem[], g: ScanGrid, o: ScanOptions)
       mappingVersion: SCAN.version,
       explanation: `${o.label}: rain system ${s.id} (${s.zone}), ${fmtLon(s.lonRange[0])}–${fmtLon(s.lonRange[1])}, ${fmtLat(s.latRange[0])}–${fmtLat(s.latRange[1])}, ${describeShape(s)}; peak ${s.peak.toFixed(digits)} ${g.unit} (${s.intensity}, ${g.derivation}) → ${midiToName(band.midi)} held while the line crosses it.`,
     };
+  });
+}
+
+// ------------------------------------------------------------------ region of interest voice (scan-v4)
+
+/**
+ * The image-derived rain inside a region of interest: the cos-latitude-weighted mean of the cells whose colour
+ * could be decoded. Unknown cells are left out (never counted as 0); a region with no known cell has no value.
+ */
+export function roiMean(g: ScanGrid): { value: number | null; known: number; cells: number } {
+  let s = 0, w = 0, known = 0;
+  for (let r = 0; r < g.nrow; r++) {
+    const wt = Math.cos(((g.latMin + (r + 0.5) * g.step) * Math.PI) / 180);
+    for (let c = 0; c < g.ncol; c++) {
+      const v = g.value(r, c);
+      if (v == null) continue;
+      s += v * wt; w += wt; known++;
+    }
+  }
+  return { value: known && w > 0 ? s / w : null, known, cells: g.nrow * g.ncol };
+}
+
+/**
+ * ROI voice (scan-v4): one short note per day for the rain inside the user's region.
+ *   PITCH = AMOUNT   linear over a fixed 0–ROI.maxMmDay mm/day (the NASA colorbar's 0–24) on the current scale
+ *   LOUDNESS = RAIN CLASS   the same classes as the sweep
+ *   SILENCE = DRY    below light rain (2 mm/day); a day with no decodable cell plays nothing and is never 0
+ * It sits half a step after the measured melody so the two never strike together.
+ */
+export const ROI = { maxMmDay: 24, offset: 0.5, duration: 0.4 };
+
+export function roiNote(mmDay: number, notes: number[]): number {
+  const i = Math.round((Math.min(ROI.maxMmDay, Math.max(0, mmDay)) / ROI.maxMmDay) * (notes.length - 1));
+  return notes[i];
+}
+
+export function roiEvents(
+  gridFor: (day: number) => ScanGrid | null, days: number,
+  o: { scale: string; pitchLow: number; pitchHigh: number; labels: string[]; area: string },
+): SoundEvent[][] {
+  const notes = scaleNotes(o.scale, o.pitchLow, o.pitchHigh);
+  return Array.from({ length: days }, (_, i) => {
+    const g = gridFor(i);
+    if (!g) return [];
+    const m = roiMean(g);
+    if (m.value == null) return [];
+    const cls = intensityClass(m.value);
+    if (cls === 'dry') return [];
+    const midi = roiNote(m.value, notes);
+    const t = `D${String(i + 1).padStart(3, '0')}`;
+    return [{
+      id: `svs5478-frames|roi|${t}`, datasetId: 'svs5478-frames', selectionId: 'roi', sourceObservationIds: [`svs5478-frames|${t}|roi`],
+      stepIndex: i, kind: 'scan', offset: ROI.offset, duration: ROI.duration, midi, note: midiToName(midi),
+      velocity: INTENSITY.velocity[cls], pan: 0, mappingVersion: SCAN.version,
+      original: { value: +m.value.toFixed(2), unit: 'mm/day', t, label: o.labels[i] ?? t, derivation: 'image-derived' },
+      explanation: `${o.labels[i] ?? t}: rain inside your region (${o.area}) averages ${m.value.toFixed(1)} mm/day (image-derived from the NASA colours, ${g.step}° cells, ${m.known} of ${m.cells} decoded) → ${midiToName(midi)}, ${cls}.`,
+    } satisfies SoundEvent];
   });
 }

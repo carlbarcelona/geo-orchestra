@@ -11,3 +11,4 @@ write one. Each line below gives a note's title, then why someone would open it.
 - [Hooks before the Preset early return](hooks-before-preset-return.md): why the Preset → Advanced switch once blanked the app, and how to write mode variants.
 - [Briefing is mandatory in Preset](briefing-mandatory-in-preset.md): the spoken pre-playback briefing, what must stay in it, and where to add a new sound.
 - [Vercel deploys only the owner's commits](vercel-hobby-commit-author.md): why only jeflecias pushes `main`, and what `TEAM_ACCESS_REQUIRED` means.
+- [Screencast slows Web Audio](screencast-slows-web-audio.md): why the demo video is captured in two passes.

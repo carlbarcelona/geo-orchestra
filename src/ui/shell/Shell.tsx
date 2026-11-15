@@ -5,7 +5,8 @@ import { NORMAL } from '../../sound/context';
 import { MAPPING } from '../../sound/mapping';
 import { SCAN } from '../../sound/frameScan';
 import { audition, auditionCue, openProject, saveProject, scanCurrent, setTab, setUiMode, stepBy, toggleCheckpoint, togglePlay, toggleLoop, type LegendKind } from '../../state/actions';
-import { set, useStore } from '../../state/store';
+import { announce, set, useStore } from '../../state/store';
+import { RESET_LAYOUT_EVENT, writeLayout } from './layout';
 import * as I from '../icons';
 import { ElementMutes } from '../shared/SoundControls';
 
@@ -106,6 +107,7 @@ export function StatusBar() {
       <span className="spacer" />
       <span className="hide-sm"><span className="kbd">Space</span> Play/Pause · <span className="kbd">L</span> Loop · <span className="kbd">C</span> Checkpoint · <span className="kbd">←</span><span className="kbd">→</span> Step</span>
       {lag.samples > 0 && <span className="hide-sm mono" title="Delay between scheduled audio time and visual highlight (target ≤ 100 ms)">sync {lag.mean.toFixed(0)}/{lag.max.toFixed(0)} ms</span>}
+      <button className="btn small ghost hide-sm" onClick={() => { writeLayout('numerical', {}); writeLayout('visual', {}); window.dispatchEvent(new Event(RESET_LAYOUT_EVENT)); announce('Panel layout reset'); }} title="Put every panel back to its default size">Reset layout</button>
       <button className="btn small ghost" onClick={() => set({ dialogs: { ...useStore.getState().dialogs, sources: true } })}><I.Database /> NASA data sources</button>
     </footer>
   );
@@ -122,7 +124,7 @@ export function useShortcuts() {
     const onKey = (e: KeyboardEvent) => {
       // key events dispatched on window/document have no element target; treat them as page-level keys
       const t = e.target instanceof Element ? e.target : document.body;
-      if (t.closest('input, select, textarea, [contenteditable="true"]') || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (t.closest('input, select, textarea, [contenteditable="true"], [role="separator"]') || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === ' ' && !t.closest('button, a, [role="tab"]')) { e.preventDefault(); void togglePlay(); }
       else if (e.key === 'l' || e.key === 'L') toggleLoop();
       else if (e.key === 's' || e.key === 'S') void scanCurrent();

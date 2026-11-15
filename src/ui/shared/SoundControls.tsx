@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BriefingButton } from '../shell/BriefingModal';
 import { INSTRUMENTS, type InstrumentId, type LayerLevels as Levels } from '../../sound/engine';
 import { NORMAL } from '../../sound/context';
 import { MAPPING, midiToName, scaleNotes, SCALES, stepSize } from '../../sound/mapping';
@@ -189,7 +190,12 @@ export function GeophonyMapping() {
 }
 
 export function LegendButton() {
-  return <button className="btn primary" style={{ width: '100%', padding: '8px 12px', fontSize: 15 }} onClick={() => set({ dialogs: { ...useStore.getState().dialogs, legend: true } })}><I.Play /> Audio legend</button>;
+  return (
+    <>
+      <button className="btn primary" style={{ width: '100%', padding: '8px 12px', fontSize: 15 }} onClick={() => set({ dialogs: { ...useStore.getState().dialogs, legend: true } })}><I.Play /> Audio legend</button>
+      <BriefingButton />
+    </>
+  );
 }
 
 export function Disclosure({ title, children, defaultOpen = false, extra }: { title: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; extra?: React.ReactNode }) {

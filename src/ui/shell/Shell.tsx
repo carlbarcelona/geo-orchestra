@@ -9,6 +9,7 @@ import { announce, set, useStore } from '../../state/store';
 import { RESET_LAYOUT_EVENT, writeLayout } from './layout';
 import * as I from '../icons';
 import { ElementMutes } from '../shared/SoundControls';
+import { BriefingModal } from './BriefingModal';
 
 export function Header() {
   const ds = useStore((s) => s.dataset);
@@ -180,6 +181,7 @@ export function Dialogs() {
   const setA = (p: Partial<typeof a11y>) => set({ a11y: { ...a11y, ...p } });
   return (
     <>
+      <BriefingModal />
       {d.a11y && (
         <Dialog title="Accessibility" onClose={close('a11y')}>
           <p>Every measurement is readable without audio in Table view and Event details. Keyboard: <span className="kbd">Space</span> play/pause, <span className="kbd">L</span> loop, <span className="kbd">←</span>/<span className="kbd">→</span> previous/next observation, <span className="kbd">Home</span>/<span className="kbd">End</span> range start/end, <span className="kbd">?</span> shortcuts.</p>
@@ -192,6 +194,7 @@ export function Dialogs() {
             <select value={a11y.describeEvery} onChange={(e) => setA({ describeEvery: Number(e.target.value) })} aria-label="Describe every N frames">
               <option value={0}>never</option><option value={7}>7 days</option><option value={15}>15 days</option><option value={30}>30 days</option>
             </select></label>
+          <label className="row" style={{ padding: '6px 0' }}><input type="checkbox" checked={a11y.briefAdvanced} onChange={(e) => setA({ briefAdvanced: e.target.checked })} /> Brief me before playback in Advanced mode (a spoken introduction to each sound; Preset mode always gives it)</label>
           <label className="row" style={{ padding: '6px 0' }}><input type="checkbox" checked={a11y.haptics} onChange={(e) => setA({ haptics: e.target.checked })} /> Vibrate with rain intensity while exploring (Android browsers; not supported on iPhone)</label>
           <label className="row" style={{ padding: '6px 0' }}><input type="checkbox" checked={a11y.speak} disabled={!speechAvailable()} onChange={(e) => { setA({ speak: e.target.checked }); if (!e.target.checked) stopSpeaking(); }} /> Speak summaries aloud (browser voice): on pause and step, and for unusual months during playback{!speechAvailable() && ' — not available in this browser'}</label>
           <p style={{ marginTop: 10 }}>Screen readers hear actions and status changes (play, pause, buffering, dataset loaded, selection) but not every frame during playback. The map has a keyboard alternative: the region selector and the coordinate picker in Map view.</p>

@@ -1,6 +1,8 @@
 import type { AlignmentEvidence, ClimatologyLinkage, FrameScanDoc, Observation, Selection, SoundEvent, StepContext, VisualMediaManifest } from '../contracts';
 import { describeCell, describeFrame } from '../a11y/braille';
 import { speak, spokenForm, stopSpeaking } from '../a11y/speech';
+import { briefingScript, briefingSignature, needsBriefing, type BriefExample } from '../a11y/briefing';
+import { BriefingPlayer } from '../a11y/briefingPlayer';
 import { explainStep, monthlyContexts, seasonalContexts } from '../sound/context';
 import { cellEvent, cropGrid, featureEvents, frameGrid, frameGridGlobal, imergGrid, SCAN, scanEvents, type ScanGrid } from '../sound/frameScan';
 import { DEFAULT_PRESET, getPreset, type ListeningPresetId } from '../sound/presets';
@@ -213,6 +215,12 @@ export function removePin(id: string) {
 // ------------------------------------------------------------------ transport
 export async function togglePlay() {
   if (get().tab === 'visual' && get().link.state !== 'reconstructed') { announce('Connect measurements before playing the visual feed'); return; }
+  if (get().briefing) return; // playback starts by itself when the briefing ends
+  if (controller.state === 'stopped' && briefingDue()) {
+    void engine.start(); // unlock audio inside the click
+    startBriefing(() => void togglePlay());
+    return;
+  }
   const ok = await controller.toggle();
   if (!ok) announce('Audio could not start in this browser. Measurements remain readable in the table.');
 }
@@ -257,6 +265,87 @@ export function announceCurrent() {
   announce(text);
   if (s.a11y.speak) speak(spokenForm(text));
 }
+
+// ------------------------------------------------------------------ session briefing
+/** The briefing for a workspace, built from what will actually sound there now. */
+export function currentBriefing(tab: Tab = get().tab) {
+  const s = get();
+  const script = briefingScript({
+    workspace: tab, mode: s.sound.mode, reference: s.sound.reference, harmony: s.sound.harmony, cues: s.sound.cues, muted: s.sound.muted,
+    imageEnabled: s.image.enabled, featureVoice: s.image.featureVoice, frameData: !!s.frameScan.doc,
+    roi: tab === 'visual' && !!s.visual.crop,
+  });
+  return { script, signature: briefingSignature(tab, s.sound.mode, script) };
+}
+/** Preset: always before the first playback (and again when the sounds change). Advanced: unless turned off. */
+export function briefingDue(tab: Tab = get().tab): boolean {
+  const s = get();
+  return needsBriefing({ uiMode: s.uiMode, briefAdvanced: s.a11y.briefAdvanced, heard: s.briefed[tab], signature: currentBriefing(tab).signature });
+}
+
+let briefingPlayer: BriefingPlayer | null = null;
+/** Open the briefing modal and perform it; `then` runs when it ends (completed, or skipped in Advanced). */
+export function startBriefing(then?: () => void) {
+  briefingPlayer?.cancel();
+  const tab = get().tab;
+  const { script, signature } = currentBriefing(tab);
+  if (controller.state !== 'stopped') controller.pause('briefing');
+  set({ briefing: { tab, script, segment: 0, word: -1, phase: 'speaking', paused: false } });
+  announce(`Briefing: what each sound means, in ${script.length} parts. ${get().uiMode === 'preset' ? 'Playback starts when it ends.' : 'Press Escape to skip.'}`);
+  const player = new BriefingPlayer(script, {
+    onProgress: (segment, word, phase) => { const b = get().briefing; if (b && briefingPlayer === player) set({ briefing: { ...b, segment, word, phase } }); },
+    playExample: (ex) => playBriefingExample(ex),
+    onDone: () => {
+      if (briefingPlayer !== player) return;
+      briefingPlayer = null;
+      set({ briefing: null, briefed: { ...get().briefed, [tab]: signature } });
+      then?.();
+    },
+  });
+  briefingPlayer = player;
+  player.start();
+}
+export function pauseBriefing() { briefingPlayer?.pause(); const b = get().briefing; if (b) set({ briefing: { ...b, paused: true } }); }
+export function resumeBriefing() { const b = get().briefing; if (b) set({ briefing: { ...b, paused: false } }); briefingPlayer?.resume(); }
+export function replayBriefingSegment() { const b = get().briefing; if (b) set({ briefing: { ...b, paused: false } }); briefingPlayer?.replaySegment(); }
+/** Advanced mode only: end the briefing now (playback then starts as if it had finished). */
+export function skipBriefing() {
+  if (get().uiMode === 'preset') return;
+  briefingPlayer?.cancel();
+}
+/** Replay button: brief again now, without starting playback afterwards. */
+export function replayBriefing() {
+  if (get().briefing) return;
+  if (controller.state !== 'stopped') controller.pause('briefing');
+  void engine.start();
+  startBriefing();
+}
+
+const pauseMs = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/** Play a briefing example with the same events as the Audio legend and the time-cue preview. */
+async function playBriefingExample(ex: BriefExample): Promise<void> {
+  const s = get();
+  if (ex.kind === 'legend') {
+    for (const k of ex.items) { await engine.audition(legendEvents(k), s.sound.mode); await pauseMs(1700); }
+  } else if (ex.kind === 'cue') {
+    for (const k of ex.items) { auditionCue(k); await pauseMs(900); }
+  } else if (ex.kind === 'glide') {
+    const days = s.frameScan.doc?.days;
+    if (!days) return;
+    const feats = featureEvents(days, { scale: s.sound.scale, pitchLow: s.sound.pitchLow, pitchHigh: s.sound.pitchHigh });
+    const lats = days.map((d) => d.bandLat).filter((v): v is number => v != null);
+    const south = days.findIndex((d) => d.bandLat === Math.min(...lats)), north = days.findIndex((d) => d.bandLat === Math.max(...lats));
+    const pick = (i: number, offset: number) => (feats[i] ?? []).filter((e) => e.kind === 'feature').map((e) => ({ ...e, offset, duration: 0.45 }));
+    await engine.audition([...pick(south, 0), ...pick(north, 0.5)], 'musical');
+    await pauseMs(1900);
+  } else if (ex.kind === 'roi') {
+    const ev = briefingRoiExample();
+    if (ev.length) { await engine.audition(ev, 'musical'); await pauseMs(1900); }
+  }
+}
+/** The ROI voice example (scan-v4): a dry-to-wet pair of ROI notes; empty until an ROI exists. */
+let briefingRoiExample: () => SoundEvent[] = () => [];
+export function setBriefingRoiExample(f: () => SoundEvent[]) { briefingRoiExample = f; }
 
 // ------------------------------------------------------------------ sound settings
 export const ELEMENT_LABELS: Record<keyof LayerLevels, string> = { melody: 'Melody', texture: 'Rain texture', markers: 'Markers', image: 'Frame sweep & band', context: 'Normal & cues', time: 'Time cues' };

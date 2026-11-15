@@ -340,3 +340,28 @@ table.data tr.missing td { color: var(--text-3); }
 .crop-box { position: absolute; border: 2px dashed #f5b942; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35); pointer-events: none; }
 .crop-box.drawing { box-shadow: none; background: rgba(245, 185, 66, 0.12); }
 .crop-box span { position: absolute; left: 0; top: -22px; background: var(--panel-2); border: 1px solid #f5b942; border-radius: 5px; padding: 1px 6px; font-size: 11px; white-space: nowrap; color: var(--text); }
+
+/* ---------- Session briefing ---------- */
+.brief-backdrop { z-index: 60; background: rgba(2, 8, 14, 0.72); }
+.dialog.brief { width: min(680px, 100%); border-color: var(--accent-line); }
+.dialog.brief h2 { display: flex; align-items: center; gap: 8px; }
+.brief-steps { display: flex; gap: 4px; margin-bottom: 12px; }
+.brief-steps span { flex: 1; height: 4px; border-radius: 2px; background: var(--line-2); }
+.brief-steps span.done { background: var(--accent-2); }
+.brief-steps span.on { background: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.brief-title { margin: 0 0 6px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.dialog .panel-body p.brief-text { font-size: 22px; line-height: 1.5; color: var(--text-3); margin: 0 0 12px; min-height: 4.5em; }
+:root[data-large='true'] .dialog .panel-body p.brief-text { font-size: 26px; }
+.brief-word { transition: color 0.12s, background 0.12s; border-radius: 4px; }
+.brief-word.read { color: var(--text); }
+.brief-word.on { color: #04211d; background: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+:root[data-contrast='high'] .brief-word.on { color: #000; background: #ffe66d; box-shadow: 0 0 0 2px #ffe66d; }
+.brief-example { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 4px 10px; border-radius: 8px; border: 1px dashed transparent; font-size: 13.5px; }
+.brief-example.on { border-color: var(--note); background: var(--note-soft); color: var(--note); font-weight: 600; }
+.brief-example.on svg { animation: brief-pulse 0.9s ease-in-out infinite alternate; }
+@keyframes brief-pulse { from { transform: scaleY(0.6); } to { transform: scaleY(1.15); } }
+.brief-all { margin: 10px 0; font-size: 12.5px; color: var(--text-2); }
+.brief-all summary { cursor: pointer; color: var(--text-3); }
+.brief-all ol { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+.brief-controls { margin-top: 6px; flex-wrap: wrap; }
+.brief-note { margin: 10px 0 0 !important; font-size: 12.5px; }

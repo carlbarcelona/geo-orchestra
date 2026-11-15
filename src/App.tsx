@@ -9,6 +9,7 @@ import { SoundPanel } from './ui/numerical/SoundPanel';
 import { MusicChart } from './ui/shared/MusicChart';
 import { Dialogs, Header, LiveRegion, StatusBar, SubBar, useShortcuts } from './ui/shell/Shell';
 import { VisualWorkspace } from './ui/visual/VisualWorkspace';
+import { ErrorBoundary } from './ui/shell/ErrorBoundary';
 import { PresetSoundPanel, StartPanel } from './ui/preset/PresetPanels';
 
 const MONTH_SPEEDS = [
@@ -22,7 +23,7 @@ function NumericalWorkspace() {
   const cursor = useStore((s) => s.cursor);
   const range = useStore((s) => s.range);
   const speed = useStore((s) => s.speed);
-  const cache = useStore((s) => s.eventsCache);
+  const cache = useStore((s) => s.eventsRev);
   const events = useMemo(() => (ds && selection ? numericalEvents() : []), [ds, selection, cache]); // eslint-disable-line react-hooks/exhaustive-deps
   const labels = useMemo(() => ds?.months.map((t) => monthLabel(t)) ?? [], [ds]);
   const sound = useStore((s) => s.sound);
@@ -52,6 +53,7 @@ function NumericalWorkspace() {
 export function App() {
   const tab = useStore((s) => s.tab);
   const a11y = useStore((s) => s.a11y);
+  const uiMode = useStore((s) => s.uiMode);
   useShortcuts();
   useEffect(() => {
     const r = document.documentElement;
@@ -64,7 +66,7 @@ export function App() {
       <a href="#main" className="skip-link">Skip to workspace</a>
       <Header />
       <SubBar />
-      {tab === 'numerical' ? <NumericalWorkspace /> : <VisualWorkspace />}
+      <ErrorBoundary resetKey={`${tab}|${uiMode}`}>{tab === 'numerical' ? <NumericalWorkspace /> : <VisualWorkspace />}</ErrorBoundary>
       <StatusBar />
       <Dialogs />
       <LiveRegion />

@@ -77,14 +77,24 @@ function bucket(events: SoundEvent[], n: number): SoundEvent[][] {
   return out;
 }
 
+// Event caches live in module scope, not in the store: they are filled lazily from render (useMemo), and a store
+// write during render causes extra renders. `eventsRev` in the store tells components that the events changed.
+let numCache: { key: string; events: SoundEvent[][] } | null = null;
+let seasonalCache: { key: string; events: SoundEvent[][] } | null = null;
+/** Drop the cached events and bump `eventsRev` so components re-read them. Returns the store patch. */
+function invalidateEvents() {
+  numCache = null;
+  seasonalCache = null;
+  return { eventsRev: get().eventsRev + 1 };
+}
+
 export function numericalEvents(): SoundEvent[][] {
   const { dataset, selection, sound } = get();
   if (!dataset || !selection) return [];
   const cueSettings = effectiveTimeCues('numerical');
   const cps = get().checkpoints.numerical;
   const key = `${dataset.id}|${selection.id}|${sound.scale}|${sound.pitchLow}|${sound.pitchHigh}|${sound.spatialPhrases}|${sound.reference}|${sound.harmony}|${sound.cues}|${sound.variation}|${JSON.stringify(cueSettings)}|${JSON.stringify(cps)}`;
-  const cache = get().eventsCache;
-  if (cache?.key === key) return cache.events;
+  if (numCache?.key === key) return numCache.events;
   const obs = observationsFor(dataset, selection);
   const ev = generateEvents(obs, {
     scale: sound.scale, pitchLow: sound.pitchLow, pitchHigh: sound.pitchHigh, spatialPhrases: sound.spatialPhrases,
@@ -94,7 +104,7 @@ export function numericalEvents(): SoundEvent[][] {
   const events = bucket(ev, obs.length);
   const cues = timeCueEvents(dataset.months, dataset.months.map((t) => monthLabel(t)), 'monthly', cueSettings, cps);
   events.forEach((step, i) => step.push(...(cues[i] ?? [])));
-  set({ eventsCache: { key, events } });
+  numCache = { key, events };
   return events;
 }
 
@@ -122,7 +132,7 @@ async function finishLoad(ds: Dataset, source: 'nasa' | 'synthetic' | 'file', wa
   const n = ds.months.length;
   const start = 0; // play the whole record from its first month (was the last 12 months)
   set({
-    dataset: ds, selection: sel, pins: sel ? [sel] : [], cursor: start, range: [0, n - 1], eventsCache: null, selectedEventId: null,
+    dataset: ds, selection: sel, pins: sel ? [sel] : [], cursor: start, range: [0, n - 1], ...invalidateEvents(), selectedEventId: null,
     load: { state: 'ready', progress: 1, message: `${n} monthly observations loaded`, errors: [], warnings, source },
   });
   attachNumerical();
@@ -172,7 +182,7 @@ export async function importProcessedFile(file: File) {
 export function removeDataset() {
   controller.pause('dataset removed');
   controller.setAdapter(null);
-  set({ dataset: null, selection: null, pins: [], cursor: 0, range: [0, 0], eventsCache: null, selectedEventId: null,
+  set({ dataset: null, selection: null, pins: [], cursor: 0, range: [0, 0], ...invalidateEvents(), selectedEventId: null,
     load: { state: 'empty', progress: 0, message: '', errors: [], warnings: [] } });
   announce('Dataset removed');
 }
@@ -181,7 +191,7 @@ export function removeDataset() {
 export function select(sel: Selection) {
   const s = get();
   if (s.selection?.id === sel.id) return;
-  set({ selection: sel, eventsCache: null, selectedEventId: null, pins: s.pins.some((p) => p.id === sel.id) ? s.pins : [...s.pins, sel].slice(-8) });
+  set({ selection: sel, ...invalidateEvents(), selectedEventId: null, pins: s.pins.some((p) => p.id === sel.id) ? s.pins : [...s.pins, sel].slice(-8) });
   if (s.tab === 'numerical') attachNumerical({ keepIndex: true });
   announce(`Selected ${sel.label}. ${sel.type === 'area' ? 'Area mean.' : 'Single grid cell.'}`);
 }
@@ -278,7 +288,7 @@ export function updateSound(patch: Partial<SoundSettings>) {
   if (patch.mode) { controller.setMode(patch.mode as SoundMode); announce(`${patch.mode === 'musical' ? 'Musical sonification' : 'Geophony'} mode`); }
   if (patch.scale != null || patch.pitchLow != null || patch.pitchHigh != null || patch.spatialPhrases != null
     || patch.reference != null || patch.harmony != null || patch.cues != null || patch.variation != null) {
-    set({ eventsCache: null });
+    set(invalidateEvents());
     if (controller.adapterId === 'monthly') controller.updateEvents(numericalEvents());
     if (controller.adapterId === 'seasonal') controller.updateEvents(seasonalEvents());
   }
@@ -322,7 +332,7 @@ export function effectiveTimeCues(tab: Tab): TimeCueSettings {
 
 /** Regenerate the current timeline's events (cue or checkpoint change) without stopping playback. */
 function refreshEvents() {
-  set({ eventsCache: null });
+  set(invalidateEvents());
   if (controller.adapterId === 'monthly') controller.updateEvents(numericalEvents());
   else if (controller.adapterId === 'seasonal') controller.updateEvents(seasonalEvents());
 }
@@ -507,6 +517,20 @@ export function seasonalObservations(): Observation[] {
 }
 
 function seasonalEvents(): SoundEvent[][] {
+  const { sound, media, link, visual, image, frameScan, checkpoints } = get();
+  const cueSettings = effectiveTimeCues('visual');
+  const key = [link.climatology ? link.state : 'none', visual.regionId, media.manifest?.frames.length ?? 0, sound.scale, sound.pitchLow, sound.pitchHigh,
+    sound.reference, sound.harmony, sound.cues, sound.variation, image.enabled, image.featureVoice, image.sweepEveryFrame, frameScan.state,
+    visual.roi, JSON.stringify(visual.crop), JSON.stringify(cueSettings), JSON.stringify(checkpoints.visual)].join('|');
+  if (seasonalCache?.key === key && link.climatology === seasonalCacheClim) return seasonalCache.events;
+  const events = buildSeasonalEvents(cueSettings);
+  seasonalCache = { key, events };
+  seasonalCacheClim = link.climatology;
+  return events;
+}
+let seasonalCacheClim: unknown = null;
+
+function buildSeasonalEvents(cueSettings: TimeCueSettings): SoundEvent[][] {
   const { sound, media } = get();
   const obs = seasonalObservations();
   const labels = media.manifest?.frames.map((f) => f.label) ?? [];
@@ -516,7 +540,7 @@ function seasonalEvents(): SoundEvent[][] {
     reference: sound.reference, harmony: sound.harmony, cues: sound.cues, variation: sound.variation,
   }, [], seasonalContexts(obs.map((o) => o.value)));
   const steps = bucket(ev, obs.length);
-  const cues = timeCueEvents(obs.map((o) => o.t), labels, 'seasonal', effectiveTimeCues('visual'), get().checkpoints.visual);
+  const cues = timeCueEvents(obs.map((o) => o.t), labels, 'seasonal', cueSettings, get().checkpoints.visual);
   steps.forEach((step, i) => step.push(...(cues[i] ?? [])));
   const { image, frameScan } = get();
   if (image.enabled && frameScan.doc && frameScan.bytes) {

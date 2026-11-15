@@ -30,7 +30,12 @@ export function VisualWorkspace() {
   const linked = link.state === 'reconstructed';
   const frameScan = useStore((s) => s.frameScan);
   const image = useStore((s) => s.image);
-  const events = useMemo(() => (linked ? seasonalEventsCached() : []), [linked, link.climatology, visual.regionId, sound.scale, sound.pitchLow, sound.pitchHigh, frameScan.state, image]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rev = useStore((s) => s.eventsRev);
+  const checkpoints = useStore((s) => s.checkpoints.visual);
+  const uiMode = useStore((s) => s.uiMode);
+  const timeCues = useStore((s) => s.timeCues.visual);
+  // seasonalEventsCached() is keyed on every input, so calling it again is cheap; the deps only decide when to ask
+  const events = useMemo(() => (linked ? seasonalEventsCached() : []), [linked, link.climatology, visual.regionId, visual.crop, visual.roi, sound, frameScan.state, image, rev, checkpoints, uiMode, timeCues]); // eslint-disable-line react-hooks/exhaustive-deps
   const labels = useMemo(() => media.manifest?.frames.map((f) => f.label) ?? [], [media.manifest]);
   const grid = useMemo(() => currentScanGrid(), [visual.day, visual.roi, visual.crop, frameScan.state, image.enabled, media.state]); // eslint-disable-line react-hooks/exhaustive-deps
   const scanEvents = useMemo(() => (grid ? currentScanEvents() : []), [grid, sound.scale, sound.pitchLow, sound.pitchHigh]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -63,10 +68,18 @@ export function VisualWorkspace() {
   );
 }
 
+/**
+ * Picks the Preset or Advanced panel. The two are separate components so that each one's hooks always run in the
+ * same order: an early return before hooks makes React throw ("Rendered more hooks…") when the mode switches,
+ * which unmounted the whole app (the Preset → Advanced freeze).
+ */
 function NasaDataPanel({ preset }: { preset: boolean }) {
+  return preset ? <PresetNasaPanel /> : <AdvancedNasaPanel />;
+}
+
+function AdvancedNasaPanel() {
   const media = useStore((s) => s.media);
   const link = useStore((s) => s.link);
-  if (preset) return <PresetNasaPanel />;
   const [tab, setTabState] = useState<'catalogue' | 'project'>('catalogue');
   const [q, setQ] = useState('');
   const match = (t: string) => !q || t.toLowerCase().includes(q.toLowerCase());

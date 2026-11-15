@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AlignmentEvidence, ClimatologyLinkage, FrameScanDoc, Selection, SoundEvent, VisualMediaManifest } from '../contracts';
+import type { AlignmentEvidence, ClimatologyLinkage, FrameScanDoc, Selection, VisualMediaManifest } from '../contracts';
 import type { Dataset } from '../data/dataset';
 import type { InstrumentId, LayerLevels, SoundMode } from '../sound/engine';
 import { DEFAULT_PRESET, type ListeningPresetId } from '../sound/presets';
@@ -73,7 +73,8 @@ export interface AppState {
   a11y: A11ySettings;
   dialogs: { a11y: boolean; legend: boolean; sources: boolean; shortcuts: boolean };
   announcement: { text: string; id: number };
-  eventsCache: { key: string; events: SoundEvent[][] } | null;
+  /** Bumped whenever the generated sound events change (the events themselves are cached in actions.ts). */
+  eventsRev: number;
   lag: { max: number; mean: number; samples: number };
 }
 
@@ -124,7 +125,7 @@ export const useStore = create<AppState>(() => ({
   a11y: { reducedMotion: typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches, highContrast: false, largeText: false, announceSteps: false, brailleCharts: true, describeEvery: 15, haptics: true, speak: false },
   dialogs: { a11y: false, legend: false, sources: false, shortcuts: false },
   announcement: { text: '', id: 0 },
-  eventsCache: null,
+  eventsRev: 0,
   lag: { max: 0, mean: 0, samples: 0 },
 }));
 

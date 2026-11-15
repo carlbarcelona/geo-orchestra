@@ -11,7 +11,7 @@ export function SoundPanel() {
   const selection = useStore((s) => s.selection);
   const cursor = useStore((s) => s.cursor);
   const sound = useStore((s) => s.sound);
-  const eventsCache = useStore((s) => s.eventsCache);
+  const eventsCache = useStore((s) => s.eventsRev);
   const obs = useMemo(() => currentObservations(), [ds, selection]); // eslint-disable-line react-hooks/exhaustive-deps
   const events = useMemo(() => (ds && selection ? numericalEvents() : []), [ds, selection, eventsCache]); // eslint-disable-line react-hooks/exhaustive-deps
   const o = obs[cursor];

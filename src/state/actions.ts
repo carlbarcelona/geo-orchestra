@@ -288,14 +288,14 @@ export function briefingDue(tab: Tab = get().tab): boolean {
 }
 
 let briefingPlayer: BriefingPlayer | null = null;
-/** Open the briefing modal and perform it; `then` runs when it ends (completed, or skipped in Advanced). */
+/** Open the briefing modal and perform it; `then` runs when it ends (completed or skipped). */
 export function startBriefing(then?: () => void) {
   briefingPlayer?.cancel();
   const tab = get().tab;
   const { script, signature } = currentBriefing(tab);
   if (controller.state !== 'stopped') controller.pause('briefing');
   set({ briefing: { tab, script, segment: 0, word: -1, phase: 'speaking', paused: false } });
-  announce(`Briefing: what each sound means, in ${script.length} parts. ${get().uiMode === 'preset' ? 'Playback starts when it ends.' : 'Press Escape to skip.'}`);
+  announce(`Briefing: what each sound means, in ${script.length} parts. ${get().uiMode === 'preset' ? 'Use Skip briefing to continue, or press Escape to pause.' : 'Press Escape to skip.'}`);
   const player = new BriefingPlayer(script, {
     onProgress: (segment, word, phase) => { const b = get().briefing; if (b && briefingPlayer === player) set({ briefing: { ...b, segment, word, phase } }); },
     playExample: (ex) => playBriefingExample(ex),
@@ -312,9 +312,8 @@ export function startBriefing(then?: () => void) {
 export function pauseBriefing() { briefingPlayer?.pause(); const b = get().briefing; if (b) set({ briefing: { ...b, paused: true } }); }
 export function resumeBriefing() { const b = get().briefing; if (b) set({ briefing: { ...b, paused: false } }); briefingPlayer?.resume(); }
 export function replayBriefingSegment() { const b = get().briefing; if (b) set({ briefing: { ...b, paused: false } }); briefingPlayer?.replaySegment(); }
-/** Advanced mode only: end the briefing now (playback then starts as if it had finished). */
+/** End the briefing now, continuing pending playback as if it had finished. */
 export function skipBriefing() {
-  if (get().uiMode === 'preset') return;
   briefingPlayer?.cancel();
 }
 /** Replay button: brief again now, without starting playback afterwards. */

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('tone', () => ({}));
 vi.mock('../src/sound/engine', () => ({
@@ -7,7 +7,8 @@ vi.mock('../src/sound/engine', () => ({
 }));
 
 import { briefingScript, briefingSignature, needsBriefing, tokenize, wordAt, wordMs, type BriefingInput } from '../src/a11y/briefing';
-import { briefingDue, currentBriefing, setUiMode, togglePlay } from '../src/state/actions';
+import { briefingDue, currentBriefing, pauseBriefing, replayBriefing, setUiMode, skipBriefing, startBriefing, togglePlay } from '../src/state/actions';
+import { controller } from '../src/playback/controller';
 import { DEFAULT_SOUND, get, set } from '../src/state/store';
 
 const base: BriefingInput = { workspace: 'numerical', mode: 'musical', reference: true, harmony: true, cues: true, muted: {} };
@@ -100,5 +101,85 @@ describe('playback waits for the briefing', () => {
     set({ briefing: null, briefed: { numerical: '', visual: '' }, a11y: { ...get().a11y, briefAdvanced: false } });
     setUiMode('advanced');
     expect(briefingDue()).toBe(false);
+  });
+});
+
+describe('skipping a briefing', () => {
+  beforeEach(() => {
+    // Finish any briefing opened by another test before isolating the clock.
+    set({ uiMode: 'advanced' });
+    skipBriefing();
+    vi.useFakeTimers();
+    vi.spyOn(controller, 'toggle').mockResolvedValue(true);
+    set({
+      tab: 'numerical', uiMode: 'preset', sound: DEFAULT_SOUND,
+      briefed: { numerical: '', visual: '' }, briefing: null,
+      a11y: { ...get().a11y, briefAdvanced: true },
+      link: { ...get().link, state: 'reconstructed' },
+    });
+  });
+
+  afterEach(() => {
+    set({ uiMode: 'advanced' });
+    skipBriefing();
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ['numerical', false], ['numerical', true],
+    ['visual', false], ['visual', true],
+  ] as const)('Preset %s: skipping (paused=%s) acknowledges only this workspace and finishes once', async (tab, paused) => {
+    set({ tab });
+    const done = vi.fn();
+    const signature = currentBriefing().signature;
+    startBriefing(done);
+    if (paused) pauseBriefing();
+    expect(get().briefing?.paused).toBe(paused);
+
+    skipBriefing();
+    expect(get().briefing).toBeNull();
+    expect(get().briefed[tab]).toBe(signature);
+    expect(get().briefed[tab === 'numerical' ? 'visual' : 'numerical']).toBe('');
+    expect(briefingDue()).toBe(false);
+    expect(done).toHaveBeenCalledTimes(1);
+
+    skipBriefing();
+    await vi.runAllTimersAsync();
+    expect(done).toHaveBeenCalledTimes(1);
+    expect(get().briefing).toBeNull();
+  });
+
+  it.each(['preset', 'advanced'] as const)('%s: skipping continues pending playback once', async (uiMode) => {
+    set({ uiMode });
+    await togglePlay();
+    expect(get().briefing).not.toBeNull();
+    expect(controller.toggle).not.toHaveBeenCalled();
+
+    skipBriefing();
+    expect(get().briefing).toBeNull();
+    expect(controller.toggle).toHaveBeenCalledTimes(1);
+    skipBriefing();
+    await vi.runAllTimersAsync();
+    expect(controller.toggle).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['numerical', 'visual'] as const)('Preset %s: skipping a manual replay does not start playback', (tab) => {
+    set({ tab });
+    replayBriefing();
+    expect(get().briefing).not.toBeNull();
+    skipBriefing();
+    expect(get().briefing).toBeNull();
+    expect(briefingDue()).toBe(false);
+    expect(controller.toggle).not.toHaveBeenCalled();
+  });
+
+  it('a new sound configuration still requires a briefing after skipping', () => {
+    startBriefing();
+    skipBriefing();
+    expect(briefingDue()).toBe(false);
+    set({ sound: { ...get().sound, mode: 'geophony' } });
+    expect(briefingDue()).toBe(true);
   });
 });

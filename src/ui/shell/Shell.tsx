@@ -45,6 +45,7 @@ export function Header() {
       <div className="header-dock" role="toolbar" aria-label="Project and display controls">
         <button className="dock-btn" onClick={saveProject} aria-label="Save project" title="Save project"><I.Save size={15} /><span className="btn-label">Save</span></button>
         <button className="dock-btn" onClick={() => openRef.current?.click()} aria-label="Open project" title="Open project"><I.Open size={15} /><span className="btn-label">Open</span></button>
+        <a className="dock-btn" href="https://github.com/carlbarcelona/geo-orchestra.git" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository (opens in a new tab)" title="GitHub repository (opens in a new tab)"><I.External size={15} /><span className="btn-label">GitHub</span></a>
         <input ref={openRef} type="file" accept=".json,application/json" hidden aria-label="Open project file"
           onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setToast(await openProject(f)); }} />
         <span className="dock-sep" aria-hidden="true" />

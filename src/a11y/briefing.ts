@@ -153,7 +153,7 @@ export function briefingSignature(workspace: string, mode: string, script: Brief
 }
 
 /**
- * Whether playback must be preceded by a briefing. Preset: always, until this exact briefing was heard in this
+ * Whether playback must be preceded by a briefing. Preset: always, until this exact briefing was heard or skipped in this
  * page session. Advanced: the same, unless the listener turned briefings off.
  */
 export function needsBriefing(o: { uiMode: 'preset' | 'advanced'; briefAdvanced: boolean; heard: string | undefined; signature: string }): boolean {

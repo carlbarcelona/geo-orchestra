@@ -7,7 +7,7 @@ import * as I from '../icons';
 /**
  * The session briefing as a modal: the sentence the commentator is reading, with each word highlighted as it is
  * spoken, and a note while its sound example plays. It closes by itself when the briefing ends.
- * Preset: it cannot be skipped (it is part of Preset mode), only paused. Advanced: Skip, and a switch to turn it off.
+ * Both modes can pause, replay or skip. Advanced also has a switch to turn briefings off.
  */
 export function BriefingModal() {
   const b = useStore((s) => s.briefing);
@@ -69,10 +69,10 @@ export function BriefingModal() {
               : <button className="btn" onClick={pauseBriefing}><I.Pause size={14} /> Pause</button>}
             <button className="btn" onClick={replayBriefingSegment}>Replay this part</button>
             <span className="spacer" />
-            {!preset && <button className="btn ghost" onClick={skipBriefing}>Skip briefing</button>}
+            <button className="btn ghost" onClick={skipBriefing}>Skip briefing</button>
           </div>
           {preset
-            ? <p className="muted brief-note">The briefing is part of Preset mode. The music starts when it ends.</p>
+            ? <p className="muted brief-note">Listen to learn what each sound means, or skip the briefing.</p>
             : (
               <label className="row brief-note">
                 <input type="checkbox" checked={briefAdvanced} onChange={(e) => set({ a11y: { ...useStore.getState().a11y, briefAdvanced: e.target.checked } })} />

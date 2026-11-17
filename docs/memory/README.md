@@ -45,5 +45,6 @@ The four types:
    worked out.
 5. **No secrets.** Never a token, a password or a credential file's contents.
 
-Narrative (what happened in a session, what was tried and abandoned) goes in
-`../../ai-history/`, not here.
+Keep session diaries out of the repository. Record design decisions and
+their rationale in the relevant technical documentation under `docs/`;
+these memory notes hold the durable facts needed to apply them.

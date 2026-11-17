@@ -10,7 +10,7 @@ import { comparePhrase, isExtreme, rankPhrase } from './context';
  *    melody and the hum is the departure from normal.
  *  - A chord says wetter (major), drier (minor) or near normal (open fifth); an unusual month adds a bell.
  *  - Geophony keeps rain density for the amount and adds thunder (much wetter) or a dry wind (much drier).
- * See docs/mapping-guide.md and ai-history/decisions/0001-rain-v2-normal-reference.md.
+ * See docs/mapping-guide.md.
  */
 export const MAPPING = {
   version: 'rain-v2',

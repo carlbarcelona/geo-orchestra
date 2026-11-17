@@ -16,14 +16,14 @@ If the hooks are not active (`git config core.hooksPath` prints nothing), run `n
 - Work on short-lived branches named `<area>/<short-description>`. For example: `data/full-archive-check`, `sound/hybrid-mode`, `ui/visual-feed-states`, `fix/seek-double-notes`.
 - Merge to `main` only after review (see below). Rebase or squash noisy WIP commits first.
 - Merge with a merge commit (`git merge --no-ff`), not a fast-forward, so each branch stays visible in `main`'s history.
-- **Only `jeflecias` pushes to `main`.** Everyone else pushes their branch and stops there; `jeflecias` gathers the branches into `main` with merge commits. Vercel's Hobby plan deploys only commits authored by a member of the Vercel team, so a `main` whose newest commit has another author is not deployed. See `CLAUDE.md` for the exact steps.
+- **Only `jeflecias` pushes to `main`.** Everyone else pushes their branch and stops there; `jeflecias` gathers the branches into `main` with merge commits. Vercel's Hobby plan deploys only commits authored by a member of the Vercel team, so a `main` whose newest commit has another author is not deployed. To gather: `git switch main && git pull --ff-only && git fetch`, then `git merge --no-ff origin/<branch>` for each branch, `npm run check`, and `git push origin main`.
 
 ## Commits
 
 - Use the imperative mood with an optional area prefix: `sound: cancel scheduled notes on region change`.
 - Keep the subject line at 72 characters or fewer. In the body, explain *why* when the reason isn't obvious.
 - One logical change per commit, and don't mix pipeline data regeneration with UI changes.
-- **No AI attribution trailers.** Do not add `Co-Authored-By: Claude …` or similar lines. The `commit-msg` hook rejects them.
+- No tool-generated attribution trailers or footers in commit messages; the `commit-msg` hook rejects them.
 - Never commit with `--no-verify` to get around a failing hook. Fix the cause instead.
 
 ## Before every commit

@@ -54,7 +54,7 @@ Every step has a plain-language caption ("Now hearing"), for example:
 
 ## Region of interest (`scan-v4`)
 
-`scan-v4` keeps every `scan-v3` rule and turns the old ROI toggle and "Crop sweep" into one **ROI tool** (decision 0003).
+`scan-v4` keeps every `scan-v3` rule and turns the old ROI toggle and "Crop sweep" into one **ROI tool**.
 
 - **Choosing the region.** The ROI button in the Visual feed header opens a bar with:
   - quick picks: Whole frame, West Pacific (detailed), Philippines, Maritime Continent
@@ -80,7 +80,7 @@ Every step has a plain-language caption ("Now hearing"), for example:
 
 ## Frame sweep (`scan-v3`): the whole frame, edge to edge
 
-`scan-v3` keeps every rule of `scan-v2` below and changes **what is swept** (decision 0002):
+`scan-v3` keeps every rule of `scan-v2` below and changes **what is swept**:
 
 - **The whole frame.** In the Visual feed's full view, the sweep reads the entire NASA SVS frame, 180°W → 180°E, from a whole-frame grid of 2.5° cells (144 × 72, `public/data/svs5478/frame-scan-global.bin`). It plays **24 beats** (15° of longitude each, about 10 s).
 - **Pitch table = the frame's own latitudes.** In the whole-frame view, the latitude → note table spans **60°S–60°N** (where IMERG has data), south = lowest, so north is still higher. The ROI view keeps the 10°S–30°N table and its 11 beats, and a crop uses the crop's own latitudes. Within one view, a latitude is always the same note.

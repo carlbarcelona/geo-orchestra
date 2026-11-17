@@ -66,7 +66,7 @@
   - buffering on an unready frame
   - loop wrap
 
-## Mode switch, resizable panels, briefing and ROI (15 Nov 2026, Claude in Chrome, localhost:5190)
+## Mode switch, resizable panels, briefing and ROI (15 Nov 2026, Chrome, localhost:5190)
 - **Preset → Advanced freeze, reproduced on `main` before the fix:** after opening the Visual feed in Preset, clicking Advanced emptied `#root` (24,123 → 0 characters of HTML). The console showed "Rendered more hooks than during the previous render" in `NasaDataPanel`. After the fix, switching both ways on both tabs takes about 60 ms per switch, with no console errors.
 - **Panels:** dragging the music chart's top edge and the left gap resizes the panels. The arrow keys on a handle move it 16 px without stepping the timeline. Reset layout clears the stored sizes. At the minimum widths, the Sound panel stacks its selects, and "Rainfall → Pitch" is fully readable.
 - **Briefing, Preset:** Start listening opens the briefing (8 parts in Compare with normal). Words highlight as they are read, every example plays, and the modal closes by itself; then playback starts ("Playing"). There is no Skip.
@@ -77,7 +77,7 @@
   - The timelapse caption adds "your region: 3.0 mm/day (image-derived) → plucked E3", and the briefing gains "Your region · ROI voice".
   - West Pacific (detailed) loads NASA's `roi/` frames.
 
-## Browser checks (Claude in Chrome, localhost)
+## Browser checks (Chrome, localhost)
 Exercised in the browser:
 - empty states (mockup Pictures 2 and 4)
 - NASA sample load
@@ -123,7 +123,7 @@ The console showed no application errors.
 - **Automated:** `tests/fullframe.test.ts` (12 tests) covers whole-frame coverage, 24 beats edge to edge, the 60°S–60°N table, the overlap check, system grouping, column extents, shape words, thresholds, held-note timing, the spoken description and crop snapping. 86 tests pass in total.
 - **Not yet done:** a browser walkthrough and listening on speakers.
 
-## rain-v2, scan-v2 and Preset mode (15 Nov 2026, Claude in Chrome, localhost)
+## rain-v2, scan-v2 and Preset mode (15 Nov 2026, Chrome, localhost)
 
 - Fresh load shows Preset. **Start listening** loaded 295 months, selected the Philippines and played from Jun 2000. The caption read, for example, "Dec 2000 · 0.392 mm/hr · wetter than a normal December (+0.6 SD) · you hear melody above the hum, bright (major) chord".
 - The graph shows the dashed 2001–2022 normal with wetter and drier shading; the piano roll shows the hum line and ▲/▼ marks.
@@ -132,7 +132,7 @@ The console showed no application errors.
 - No console errors.
 - **Not verified:** how it sounds on speakers (hum level, chord balance, thunder and wind cues), narration voices, and the 1180 px / 720 px layouts. These need a listening session on the demo laptop.
 
-## Time cues and checkpoints (15 Nov 2026, Claude in Chrome, localhost)
+## Time cues and checkpoints (15 Nov 2026, Chrome, localhost)
 
 - Preset Numerical: Start listening, then pause and step.
   - Pressing C at Jan 2001 added a checkpoint. It showed as a chip, a flag in the piano roll and a dotted line on the graph, and the caption read "Checkpoint “Jan 2001” · Jan 2001 · 0.225 mm/hr · close to a normal January…".
